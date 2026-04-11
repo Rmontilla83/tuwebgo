@@ -426,10 +426,10 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave }: {
 // ── Shared UI ──
 function Modal({ title, icon, onClose, children }: { title: string; icon?: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 bg-black/50" onClick={onClose}>
-      <div className="bg-white w-full sm:rounded-2xl sm:max-w-md max-h-full sm:max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-scale border-0 sm:border border-[var(--border-light)]"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-white w-full sm:rounded-2xl sm:max-w-md rounded-t-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-scale border-0 sm:border border-[var(--border-light)]"
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[var(--border-light)] sticky top-0 bg-white z-10">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[var(--border-light)] sticky top-0 bg-white z-10 rounded-t-2xl sm:rounded-t-2xl">
           <div className="flex items-center gap-2.5">
             {icon && <span className="text-xl">{icon}</span>}
             <h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2>
