@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Lead = {
@@ -42,6 +42,12 @@ export default function PipelinePage() {
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
+  // Filters & search
+  const [search, setSearch] = useState('')
+  const [filterChannel, setFilterChannel] = useState('')
+  const [filterPlan, setFilterPlan] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+
   const fetchData = useCallback(async () => {
     const [{ data: s }, { data: l }] = await Promise.all([
       supabase.from('pipeline_stages').select('*').order('sort_order'),
@@ -52,7 +58,24 @@ export default function PipelinePage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Track scroll position for fade indicators
+  // Filtered leads
+  const filteredLeads = useMemo(() => {
+    return leads.filter(l => {
+      if (search) {
+        const q = search.toLowerCase()
+        const match = [l.name, l.phone, l.business_name, l.ref_code]
+          .filter(Boolean).some(f => f!.toLowerCase().includes(q))
+        if (!match) return false
+      }
+      if (filterChannel && l.source_channel !== filterChannel) return false
+      if (filterPlan && l.plan_interested !== filterPlan) return false
+      return true
+    })
+  }, [leads, search, filterChannel, filterPlan])
+
+  const hasActiveFilters = search || filterChannel || filterPlan
+
+  // Scroll indicators
   const updateScrollIndicators = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
@@ -70,10 +93,8 @@ export default function PipelinePage() {
     return () => { el.removeEventListener('scroll', updateScrollIndicators); ro.disconnect() }
   }, [loading, updateScrollIndicators])
 
-  function scrollBoard(direction: 'left' | 'right') {
-    const el = scrollRef.current
-    if (!el) return
-    el.scrollBy({ left: direction === 'left' ? -300 : 300, behavior: 'smooth' })
+  function scrollBoard(dir: 'left' | 'right') {
+    scrollRef.current?.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' })
   }
 
   async function moveToStage(leadId: string, newStage: string) {
@@ -84,45 +105,111 @@ export default function PipelinePage() {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, current_stage: newStage } : l))
   }
 
+  async function deleteLead(leadId: string) {
+    await supabase.from('leads').delete().eq('id', leadId)
+    setLeads(prev => prev.filter(l => l.id !== leadId))
+    setEditLead(null)
+  }
+
+  function exportCsv() {
+    const headers = ['Nombre', 'Teléfono', 'Negocio', 'Canal', 'Etapa', 'Plan', 'Cotizado', 'Pagado', 'Ref Code', 'Fecha', 'Notas']
+    const rows = filteredLeads.map(l => [
+      l.name || '', l.phone || '', l.business_name || '',
+      SOURCE_LABELS[l.source_channel] || l.source_channel,
+      stages.find(s => s.slug === l.current_stage)?.label || l.current_stage,
+      PLAN_LABELS[l.plan_interested || ''] || l.plan_interested || '',
+      l.amount_quoted || '', l.amount_paid || '',
+      l.ref_code || '', new Date(l.created_at).toLocaleDateString('es-VE'),
+      (l.notes || '').replace(/[\n\r,]/g, ' '),
+    ])
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `tuwebgo-leads-${new Date().toISOString().split('T')[0]}.csv`
+    a.click(); URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div></div>
   }
 
   const visibleStages = stages.filter(s => !s.is_lost)
-  const totalValue = leads.filter(l => l.current_stage !== 'perdido').reduce((s, l) => s + (l.amount_quoted || 0), 0)
+  const totalValue = filteredLeads.filter(l => l.current_stage !== 'perdido').reduce((s, l) => s + (l.amount_quoted || 0), 0)
 
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Pipeline</h1>
           <div className="flex items-center gap-4 mt-1">
-            <p className="text-sm text-[var(--text-secondary)]">{leads.length} leads</p>
+            <p className="text-sm text-[var(--text-secondary)]">{filteredLeads.length}{hasActiveFilters ? ` de ${leads.length}` : ''} leads</p>
             {totalValue > 0 && <p className="text-sm text-[var(--text-secondary)]">· Valor: <span className="font-semibold text-[var(--dark)]">${totalValue}</span></p>}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={exportCsv} title="Exportar CSV"
+            className="px-3 py-2 sm:py-2.5 rounded-xl border border-[var(--border)] text-xs sm:text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer">
+            <span className="flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <span className="hidden sm:inline">CSV</span>
+            </span>
+          </button>
           <button onClick={() => setShowLinkRef(true)}
             className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[var(--green)] text-white text-xs sm:text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 transition-all cursor-pointer shadow-md shadow-emerald-500/20 active:scale-[0.97]">
-            <span className="flex items-center gap-1.5 sm:gap-2">
+            <span className="flex items-center gap-1.5">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-              <span className="hidden sm:inline">Vincular</span> ref code
+              <span className="hidden sm:inline">Vincular</span> ref
             </span>
           </button>
           <button onClick={() => setShowNewLead(true)}
             className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[var(--primary)] text-white text-xs sm:text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.97]">
-            + Nuevo lead
+            + Lead
           </button>
         </div>
       </div>
 
+      {/* Search & Filters */}
+      <div className="flex gap-2 items-center mb-4">
+        <div className="flex-1 relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, teléfono, negocio o ref code..."
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border)] bg-white text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)] transition-all" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>}
+        </div>
+        <button onClick={() => setShowFilters(!showFilters)}
+          className={`px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${showFilters || hasActiveFilters ? 'border-[var(--primary)] bg-[var(--primary-glow)] text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)]'}`}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+        </button>
+      </div>
+
+      {showFilters && (
+        <div className="flex gap-2 items-center mb-4 animate-fade-in flex-wrap">
+          <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-[var(--border)] bg-white text-sm text-[var(--dark)]">
+            <option value="">Todos los canales</option>
+            {Object.entries(SOURCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <select value={filterPlan} onChange={e => setFilterPlan(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-[var(--border)] bg-white text-sm text-[var(--dark)]">
+            <option value="">Todos los planes</option>
+            {Object.entries(PLAN_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          {hasActiveFilters && (
+            <button onClick={() => { setSearch(''); setFilterChannel(''); setFilterPlan('') }}
+              className="px-3 py-2 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-50 transition-all cursor-pointer">
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── MOBILE: Tab view ── */}
       <div className="md:hidden">
-        {/* Stage tabs */}
-        <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-hide">
+        <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
           {visibleStages.map((stage) => {
-            const count = leads.filter(l => l.current_stage === stage.slug).length
+            const count = filteredLeads.filter(l => l.current_stage === stage.slug).length
             const theme = STAGE_THEME[stage.slug]
             const active = mobileTab === stage.slug
             return (
@@ -132,64 +219,50 @@ export default function PipelinePage() {
                 }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white/70' : theme?.dot || 'bg-gray-400'}`}></span>
                 {stage.label}
-                <span className={`ml-0.5 px-1.5 py-0 rounded-full text-[10px] ${active ? 'bg-white/20' : 'bg-[var(--bg-alt)]'}`}>{count}</span>
+                <span className={`ml-0.5 px-1.5 rounded-full text-[10px] ${active ? 'bg-white/20' : 'bg-[var(--bg-alt)]'}`}>{count}</span>
               </button>
             )
           })}
         </div>
-
-        {/* Cards for selected stage */}
         <div className="space-y-2.5 mt-1">
-          {leads.filter(l => l.current_stage === mobileTab).map((lead) => (
+          {filteredLeads.filter(l => l.current_stage === mobileTab).map((lead) => (
             <LeadCard key={lead.id} lead={lead} onClick={() => setEditLead(lead)} />
           ))}
-          {leads.filter(l => l.current_stage === mobileTab).length === 0 && (
+          {filteredLeads.filter(l => l.current_stage === mobileTab).length === 0 && (
             <div className="text-center py-12 bg-white rounded-2xl border border-[var(--border)]">
-              <p className="text-sm text-[var(--text-muted)]">Sin leads en esta etapa</p>
+              <p className="text-sm text-[var(--text-muted)]">{hasActiveFilters ? 'Sin resultados con estos filtros' : 'Sin leads en esta etapa'}</p>
             </div>
           )}
         </div>
-
-        {/* Mobile stage move buttons */}
-        {editLead && null /* handled by modal */}
       </div>
 
       {/* ── DESKTOP: Kanban board ── */}
       <div className="hidden md:block relative">
-        {/* Scroll indicators */}
         {canScrollLeft && (
-          <button onClick={() => scrollBoard('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 border border-[var(--border)] shadow-lg flex items-center justify-center cursor-pointer hover:bg-white transition-all -ml-3">
+          <button onClick={() => scrollBoard('left')} className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 border border-[var(--border)] shadow-lg flex items-center justify-center cursor-pointer hover:bg-white transition-all -ml-3">
             <svg className="w-5 h-5 text-[var(--dark)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
         )}
         {canScrollRight && (
-          <button onClick={() => scrollBoard('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 border border-[var(--border)] shadow-lg flex items-center justify-center cursor-pointer hover:bg-white transition-all -mr-3">
+          <button onClick={() => scrollBoard('right')} className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 border border-[var(--border)] shadow-lg flex items-center justify-center cursor-pointer hover:bg-white transition-all -mr-3">
             <svg className="w-5 h-5 text-[var(--dark)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </button>
         )}
-
-        {/* Fade edges */}
-        {canScrollLeft && <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[var(--bg)] to-transparent z-10 pointer-events-none rounded-l-2xl"></div>}
-        {canScrollRight && <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[var(--bg)] to-transparent z-10 pointer-events-none rounded-r-2xl"></div>}
+        {canScrollLeft && <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[var(--bg)] to-transparent z-10 pointer-events-none"></div>}
+        {canScrollRight && <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[var(--bg)] to-transparent z-10 pointer-events-none"></div>}
 
         <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-3 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
           {visibleStages.map((stage) => {
-            const stageLeads = leads.filter(l => l.current_stage === stage.slug)
+            const stageLeads = filteredLeads.filter(l => l.current_stage === stage.slug)
             const theme = STAGE_THEME[stage.slug] || { border: 'border-t-gray-400', dot: 'bg-gray-400', bg: 'bg-gray-400/5' }
             const isDragTarget = dragOver === stage.slug
-
             return (
-              <div
-                key={stage.slug}
+              <div key={stage.slug}
                 className={`flex-shrink-0 rounded-2xl border border-[var(--border)] transition-all duration-200 ${theme.bg} ${isDragTarget ? 'ring-2 ring-[var(--primary)] ring-offset-2 scale-[1.01]' : ''}`}
                 style={{ width: 'clamp(220px, calc((100% - 60px) / 6), 300px)', minWidth: '220px' }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(stage.slug) }}
                 onDragLeave={() => setDragOver(null)}
-                onDrop={() => { if (draggedLead) { moveToStage(draggedLead, stage.slug); setDraggedLead(null); setDragOver(null) } }}
-              >
-                {/* Column header */}
+                onDrop={() => { if (draggedLead) { moveToStage(draggedLead, stage.slug); setDraggedLead(null); setDragOver(null) } }}>
                 <div className={`p-3 lg:p-4 border-t-[3px] rounded-t-2xl ${theme.border}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
@@ -199,41 +272,29 @@ export default function PipelinePage() {
                     <span className="text-[10px] lg:text-[11px] font-bold text-[var(--text-muted)] bg-white/80 px-1.5 lg:px-2 py-0.5 rounded-full border border-[var(--border-light)] flex-shrink-0 ml-1">{stageLeads.length}</span>
                   </div>
                 </div>
-
-                {/* Cards */}
-                <div className="p-2 lg:p-2.5 space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto">
+                <div className="p-2 lg:p-2.5 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
                   {stageLeads.map((lead) => (
-                    <div
-                      key={lead.id}
-                      draggable
+                    <div key={lead.id} draggable
                       onDragStart={() => setDraggedLead(lead.id)}
                       onDragEnd={() => { setDraggedLead(null); setDragOver(null) }}
                       onClick={() => setEditLead(lead)}
-                      className={`bg-white rounded-xl p-3 border border-[var(--border-light)] shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.97] active:shadow-lg group ${draggedLead === lead.id ? 'opacity-30 scale-95' : ''}`}
-                    >
+                      className={`bg-white rounded-xl p-3 border border-[var(--border-light)] shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.97] group ${draggedLead === lead.id ? 'opacity-30 scale-95' : ''}`}>
                       <div className="flex items-start justify-between gap-1">
                         <p className="font-semibold text-[13px] text-[var(--dark)] leading-snug truncate">{lead.name || 'Sin nombre'}</p>
                         <svg className="w-3 h-3 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                       </div>
                       {lead.business_name && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
                       <div className="flex items-center gap-1 mt-2 flex-wrap">
-                        {lead.plan_interested && (
-                          <span className="text-[9px] lg:text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">
-                            {PLAN_LABELS[lead.plan_interested] || lead.plan_interested}
-                          </span>
-                        )}
-                        {lead.amount_paid ? (
-                          <span className="text-[9px] lg:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
-                        ) : lead.amount_quoted ? (
-                          <span className="text-[9px] lg:text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span>
-                        ) : null}
+                        {lead.plan_interested && <span className="text-[9px] lg:text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">{PLAN_LABELS[lead.plan_interested] || lead.plan_interested}</span>}
+                        {lead.amount_paid ? <span className="text-[9px] lg:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
+                        : lead.amount_quoted ? <span className="text-[9px] lg:text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span> : null}
                       </div>
                       {lead.ref_code && <p className="text-[8px] lg:text-[9px] text-[var(--text-muted)] mt-1.5 font-mono tracking-wider opacity-50">{lead.ref_code}</p>}
                     </div>
                   ))}
                   {stageLeads.length === 0 && (
                     <div className={`text-center py-8 rounded-xl border-2 border-dashed border-[var(--border-light)] ${isDragTarget ? 'bg-[var(--primary-glow)] border-[var(--primary)]' : ''} transition-all`}>
-                      <p className="text-[11px] text-[var(--text-muted)]">{isDragTarget ? 'Soltar aquí' : 'Vacío'}</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">{isDragTarget ? 'Soltar aquí' : hasActiveFilters ? 'Sin resultados' : 'Vacío'}</p>
                     </div>
                   )}
                 </div>
@@ -246,7 +307,9 @@ export default function PipelinePage() {
       {/* Modals */}
       {showNewLead && <NewLeadModal onClose={() => setShowNewLead(false)} onSave={async (data) => { await supabase.from('leads').insert(data); setShowNewLead(false); fetchData() }} />}
       {showLinkRef && <LinkRefModal supabase={supabase} onClose={() => setShowLinkRef(false)} onLinked={() => { setShowLinkRef(false); fetchData() }} />}
-      {editLead && <EditLeadModal lead={editLead} stages={stages} supabase={supabase} onClose={() => setEditLead(null)} onSave={async (data) => { await supabase.from('leads').update(data).eq('id', editLead.id); setEditLead(null); fetchData() }} />}
+      {editLead && <EditLeadModal lead={editLead} stages={stages} supabase={supabase} onClose={() => setEditLead(null)}
+        onSave={async (data) => { await supabase.from('leads').update(data).eq('id', editLead.id); setEditLead(null); fetchData() }}
+        onDelete={() => deleteLead(editLead.id)} />}
     </div>
   )
 }
@@ -254,8 +317,7 @@ export default function PipelinePage() {
 // ── Lead Card (mobile) ──
 function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   return (
-    <div onClick={onClick}
-      className="bg-white rounded-xl p-4 border border-[var(--border-light)] shadow-sm active:scale-[0.98] transition-all cursor-pointer">
+    <div onClick={onClick} className="bg-white rounded-xl p-4 border border-[var(--border-light)] shadow-sm active:scale-[0.98] transition-all cursor-pointer">
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm text-[var(--dark)]">{lead.name || 'Sin nombre'}</p>
@@ -264,16 +326,9 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
         <svg className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
       </div>
       <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-        {lead.plan_interested && (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">
-            {PLAN_LABELS[lead.plan_interested] || lead.plan_interested}
-          </span>
-        )}
-        {lead.amount_paid ? (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
-        ) : lead.amount_quoted ? (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span>
-        ) : null}
+        {lead.plan_interested && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">{PLAN_LABELS[lead.plan_interested] || lead.plan_interested}</span>}
+        {lead.amount_paid ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
+        : lead.amount_quoted ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span> : null}
         {lead.ref_code && <span className="text-[9px] text-[var(--text-muted)] font-mono">{lead.ref_code}</span>}
       </div>
     </div>
@@ -284,7 +339,6 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 function NewLeadModal({ onClose, onSave }: { onClose: () => void; onSave: (data: Record<string, unknown>) => void }) {
   const [form, setForm] = useState({ name: '', phone: '', business_name: '', source_channel: 'landing_page', plan_interested: '', notes: '' })
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-
   return (
     <Modal title="Nuevo Lead" icon="👤" onClose={onClose}>
       <div className="space-y-4">
@@ -292,9 +346,7 @@ function NewLeadModal({ onClose, onSave }: { onClose: () => void; onSave: (data:
         <Input label="Teléfono" value={form.phone} onChange={v => set('phone', v)} />
         <Input label="Negocio" value={form.business_name} onChange={v => set('business_name', v)} />
         <Select label="Canal de origen" value={form.source_channel} onChange={v => set('source_channel', v)} options={Object.entries(SOURCE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-        <Select label="Plan interesado" value={form.plan_interested} onChange={v => set('plan_interested', v)} options={[
-          { value: '', label: 'Sin definir' }, ...Object.entries(PLAN_LABELS).map(([v, l]) => ({ value: v, label: l })),
-        ]} />
+        <Select label="Plan interesado" value={form.plan_interested} onChange={v => set('plan_interested', v)} options={[{ value: '', label: 'Sin definir' }, ...Object.entries(PLAN_LABELS).map(([v, l]) => ({ value: v, label: l }))]} />
         <Textarea label="Notas" value={form.notes} onChange={v => set('notes', v)} />
         <BtnPrimary onClick={() => onSave({ ...form, plan_interested: form.plan_interested || null, notes: form.notes || null })}>Crear lead</BtnPrimary>
       </div>
@@ -342,7 +394,7 @@ function LinkRefModal({ supabase, onClose, onLinked }: { supabase: ReturnType<ty
         <input type="text" value={refCode} onChange={e => setRefCode(e.target.value)} placeholder="TW-a3f2"
           className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--dark)] text-sm font-mono font-bold tracking-wider placeholder:text-[var(--text-muted)] placeholder:font-normal transition-all" autoFocus />
         <button onClick={handleLink} disabled={loading || !refCode.trim()}
-          className="px-5 sm:px-6 py-3 rounded-xl bg-[var(--green)] text-white font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-40 cursor-pointer active:scale-[0.97]">
+          className="px-5 py-3 rounded-xl bg-[var(--green)] text-white font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-40 cursor-pointer active:scale-[0.97]">
           {loading ? '...' : 'Buscar'}
         </button>
       </div>
@@ -364,9 +416,9 @@ function LinkRefModal({ supabase, onClose, onLinked }: { supabase: ReturnType<ty
 }
 
 // ── Edit Lead Modal ──
-function EditLeadModal({ lead, stages, supabase, onClose, onSave }: {
+function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
   lead: Lead; stages: Stage[]; supabase: ReturnType<typeof createClient>
-  onClose: () => void; onSave: (data: Record<string, unknown>) => void
+  onClose: () => void; onSave: (data: Record<string, unknown>) => void; onDelete: () => void
 }) {
   const [form, setForm] = useState({
     name: lead.name || '', phone: lead.phone || '', business_name: lead.business_name || '',
@@ -375,6 +427,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave }: {
     notes: lead.notes || '',
   })
   const [sessionInfo, setSessionInfo] = useState<Record<string, string> | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   useEffect(() => {
@@ -418,6 +471,27 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave }: {
           amount_paid: form.amount_paid ? parseFloat(form.amount_paid) : null,
           plan_interested: form.plan_interested || null, notes: form.notes || null,
         })}>Guardar cambios</BtnPrimary>
+
+        {/* Delete */}
+        <div className="pt-3 border-t border-[var(--border-light)]">
+          {!confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)}
+              className="w-full py-2 text-xs text-red-400 hover:text-red-600 transition-colors cursor-pointer font-[Space_Grotesk,sans-serif]">
+              Eliminar lead
+            </button>
+          ) : (
+            <div className="flex gap-2 animate-fade-in">
+              <button onClick={onDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-all cursor-pointer active:scale-[0.98]">
+                Confirmar eliminación
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer">
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   )
