@@ -16,13 +16,22 @@ async function getMetrics() {
     supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('first_seen_at', startOfMonth),
     supabase.from('events').select('*', { count: 'exact', head: true }).eq('event_type', 'cta_click').gte('created_at', startOfMonth),
     supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth),
-    supabase.from('leads').select('current_stage, amount_paid').gte('created_at', startOfMonth),
+    supabase.from('leads').select('current_stage, amount_paid, amount_quoted').gte('created_at', startOfMonth),
     supabase.from('leads').select('id, name, business_name, current_stage, plan_interested, source_channel, created_at').order('created_at', { ascending: false }).limit(8),
-    supabase.from('pipeline_stages').select('*').order('sort_order'),
+    supabase.from('pipeline_stages').select('*, win_probability').order('sort_order'),
   ])
 
   const wonLeads = leads?.filter(l => l.current_stage === 'pagado' || l.current_stage === 'entregado') || []
   const revenue = wonLeads.reduce((sum, l) => sum + (l.amount_paid || 0), 0)
+
+  // Forecast ponderado
+  let forecast = 0
+  for (const lead of leads || []) {
+    if (lead.current_stage === 'perdido') continue
+    const prob = stages?.find(s => s.slug === lead.current_stage)?.win_probability || 0
+    forecast += (lead.amount_quoted || 0) * (prob / 100)
+  }
+  forecast = Math.round(forecast)
 
   const stageCounts: Record<string, number> = {}
   for (const stage of stages || []) {
@@ -42,6 +51,7 @@ async function getMetrics() {
     recentLeads: recentLeads || [],
     stages: stages || [],
     stageCounts,
+    forecast,
   }
 }
 
@@ -128,6 +138,7 @@ export default async function DashboardPage() {
                 {m.totalSessions > 0 ? ((m.wonLeads / m.totalSessions) * 100).toFixed(1) : '0'}%
               </p>
               <p className="text-white/40 text-xs mt-2">Sesión → Venta cerrada</p>
+            {m.forecast > 0 && <p className="text-white/50 text-xs mt-3 pt-3 border-t border-white/10">Forecast ponderado: <span className="text-white font-bold">${m.forecast}</span></p>}
             </div>
           </div>
 
