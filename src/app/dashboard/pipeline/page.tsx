@@ -470,13 +470,15 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
 // ── Shared UI ──
 function Modal({title,icon,onClose,children}:{title:string;icon?:string;onClose:()=>void;children:React.ReactNode}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl animate-fade-in-scale border border-[var(--border-light)]" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)] flex-shrink-0">
-          <div className="flex items-center gap-2.5">{icon&&<span className="text-xl">{icon}</span>}<h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2></div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer p-1.5 rounded-lg hover:bg-[var(--bg-alt)]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50" onClick={onClose}>
+      <div className="min-h-full flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl animate-fade-in-scale border border-[var(--border-light)]" onClick={e=>e.stopPropagation()}>
+          <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)] sticky top-0 bg-white rounded-t-2xl z-10">
+            <div className="flex items-center gap-2.5">{icon&&<span className="text-xl">{icon}</span>}<h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2></div>
+            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer p-1.5 rounded-lg hover:bg-[var(--bg-alt)]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+          </div>
+          <div className="p-5">{children}</div>
         </div>
-        <div className="p-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   )
