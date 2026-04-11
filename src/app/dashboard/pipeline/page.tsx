@@ -4,46 +4,27 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Lead = {
-  id: string
-  name: string | null
-  phone: string | null
-  business_name: string | null
-  source_channel: string
-  current_stage: string
-  plan_interested: string | null
-  amount_quoted: number | null
-  amount_paid: number | null
-  notes: string | null
-  ref_code: string | null
-  created_at: string
+  id: string; name: string | null; phone: string | null; business_name: string | null
+  source_channel: string; current_stage: string; plan_interested: string | null
+  amount_quoted: number | null; amount_paid: number | null; notes: string | null
+  ref_code: string | null; created_at: string
 }
 
-type Stage = {
-  slug: string
-  label: string
-  sort_order: number
-  is_won: boolean
-  is_lost: boolean
+type Stage = { slug: string; label: string; sort_order: number; is_won: boolean; is_lost: boolean }
+
+const STAGE_THEME: Record<string, { border: string; dot: string; bg: string }> = {
+  nuevo:              { border: 'border-t-blue-400',    dot: 'bg-blue-400',    bg: 'bg-blue-400/5' },
+  contactado:         { border: 'border-t-amber-400',   dot: 'bg-amber-400',   bg: 'bg-amber-400/5' },
+  pre_diseno_enviado: { border: 'border-t-purple-400',  dot: 'bg-purple-400',  bg: 'bg-purple-400/5' },
+  aprobado:           { border: 'border-t-indigo-400',  dot: 'bg-indigo-400',  bg: 'bg-indigo-400/5' },
+  pagado:             { border: 'border-t-emerald-500', dot: 'bg-emerald-500', bg: 'bg-emerald-500/5' },
+  entregado:          { border: 'border-t-teal-500',    dot: 'bg-teal-500',    bg: 'bg-teal-500/5' },
 }
 
-const STAGE_COLORS: Record<string, string> = {
-  nuevo: 'border-t-blue-400',
-  contactado: 'border-t-yellow-400',
-  pre_diseno_enviado: 'border-t-purple-400',
-  aprobado: 'border-t-indigo-400',
-  pagado: 'border-t-green-400',
-  entregado: 'border-t-emerald-400',
-  perdido: 'border-t-red-400',
-}
-
-const STAGE_DOT: Record<string, string> = {
-  nuevo: 'bg-blue-400',
-  contactado: 'bg-yellow-400',
-  pre_diseno_enviado: 'bg-purple-400',
-  aprobado: 'bg-indigo-400',
-  pagado: 'bg-green-400',
-  entregado: 'bg-emerald-400',
-  perdido: 'bg-red-400',
+const PLAN_LABELS: Record<string, string> = { pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' }
+const SOURCE_LABELS: Record<string, string> = {
+  landing_page: 'Landing', instagram_dm: 'Instagram', referral: 'Referido',
+  meta_ads_direct: 'Meta Ads', organic_wa: 'WhatsApp', other: 'Otro',
 }
 
 export default function PipelinePage() {
@@ -54,16 +35,15 @@ export default function PipelinePage() {
   const [showNewLead, setShowNewLead] = useState(false)
   const [showLinkRef, setShowLinkRef] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
+  const [dragOver, setDragOver] = useState<string | null>(null)
   const [draggedLead, setDraggedLead] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    const [{ data: stagesData }, { data: leadsData }] = await Promise.all([
+    const [{ data: s }, { data: l }] = await Promise.all([
       supabase.from('pipeline_stages').select('*').order('sort_order'),
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
     ])
-    setStages(stagesData || [])
-    setLeads(leadsData || [])
-    setLoading(false)
+    setStages(s || []); setLeads(l || []); setLoading(false)
   }, [supabase])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -71,104 +51,114 @@ export default function PipelinePage() {
   async function moveToStage(leadId: string, newStage: string) {
     const updates: Record<string, unknown> = { current_stage: newStage }
     const stage = stages.find(s => s.slug === newStage)
-    if (stage?.is_won || stage?.is_lost) {
-      updates.closed_at = new Date().toISOString()
-    }
+    if (stage?.is_won || stage?.is_lost) updates.closed_at = new Date().toISOString()
     await supabase.from('leads').update(updates).eq('id', leadId)
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, current_stage: newStage } : l))
   }
 
-  function handleDragStart(leadId: string) {
-    setDraggedLead(leadId)
-  }
-
-  function handleDrop(stageSlug: string) {
-    if (draggedLead) {
-      moveToStage(draggedLead, stageSlug)
-      setDraggedLead(null)
-    }
-  }
-
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><p className="text-[#94A3B8]">Cargando pipeline...</p></div>
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )
   }
 
   const visibleStages = stages.filter(s => !s.is_lost)
+  const totalValue = leads.filter(l => l.current_stage !== 'perdido').reduce((s, l) => s + (l.amount_quoted || 0), 0)
 
   return (
-    <div>
+    <div className="animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1E1B4B]">Pipeline</h1>
-          <p className="text-sm text-[#64748B] mt-1">{leads.length} leads en total</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Pipeline</h1>
+          <div className="flex items-center gap-4 mt-1">
+            <p className="text-sm text-[var(--text-secondary)]">{leads.length} leads</p>
+            {totalValue > 0 && <p className="text-sm text-[var(--text-secondary)]">·  Valor: <span className="font-semibold text-[var(--dark)]">${totalValue}</span></p>}
+          </div>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowLinkRef(true)}
-            className="px-4 py-2 rounded-xl bg-[#059669] text-white text-sm font-semibold hover:bg-[#047857] transition-all cursor-pointer"
-          >
-            Vincular ref code
+          <button onClick={() => setShowLinkRef(true)}
+            className="px-4 py-2.5 rounded-xl bg-[var(--green)] text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 transition-all cursor-pointer shadow-md shadow-emerald-500/20 active:scale-[0.97]">
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              Vincular ref code
+            </span>
           </button>
-          <button
-            onClick={() => setShowNewLead(true)}
-            className="px-4 py-2 rounded-xl bg-[#4F46E5] text-white text-sm font-semibold hover:bg-[#6366F1] transition-all cursor-pointer"
-          >
+          <button onClick={() => setShowNewLead(true)}
+            className="px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.97]">
             + Nuevo lead
           </button>
         </div>
       </div>
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4 min-h-[60vh]">
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 snap-x snap-mandatory lg:snap-none">
         {visibleStages.map((stage) => {
           const stageLeads = leads.filter(l => l.current_stage === stage.slug)
+          const theme = STAGE_THEME[stage.slug] || { border: 'border-t-gray-400', dot: 'bg-gray-400', bg: 'bg-gray-400/5' }
+          const isDragTarget = dragOver === stage.slug
+
           return (
             <div
               key={stage.slug}
-              className="flex-shrink-0 w-72 bg-[#FAFAFE] rounded-2xl border border-[#E0DEF7]"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => handleDrop(stage.slug)}
+              className={`flex-shrink-0 w-[280px] sm:w-[300px] rounded-2xl border border-[var(--border)] snap-start transition-all duration-200 ${theme.bg} ${isDragTarget ? 'ring-2 ring-[var(--primary)] ring-offset-2 scale-[1.01]' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(stage.slug) }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={() => { if (draggedLead) { moveToStage(draggedLead, stage.slug); setDraggedLead(null); setDragOver(null) } }}
             >
-              <div className={`p-4 border-t-4 rounded-t-2xl ${STAGE_COLORS[stage.slug]}`}>
+              {/* Column header */}
+              <div className={`p-4 border-t-[3px] rounded-t-2xl ${theme.border}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage.slug]}`}></span>
-                    <h3 className="font-bold text-sm text-[#1E1B4B]">{stage.label}</h3>
+                    <span className={`w-2 h-2 rounded-full ${theme.dot} animate-pulse-soft`}></span>
+                    <h3 className="font-bold text-[13px] text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{stage.label}</h3>
                   </div>
-                  <span className="text-xs font-bold text-[#94A3B8] bg-white px-2 py-0.5 rounded-full">{stageLeads.length}</span>
+                  <span className="text-[11px] font-bold text-[var(--text-muted)] bg-white/80 px-2 py-0.5 rounded-full border border-[var(--border-light)]">{stageLeads.length}</span>
                 </div>
               </div>
 
-              <div className="p-3 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
-                {stageLeads.map((lead) => (
+              {/* Cards */}
+              <div className="p-2.5 space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto">
+                {stageLeads.map((lead, i) => (
                   <div
                     key={lead.id}
                     draggable
-                    onDragStart={() => handleDragStart(lead.id)}
+                    onDragStart={() => setDraggedLead(lead.id)}
+                    onDragEnd={() => { setDraggedLead(null); setDragOver(null) }}
                     onClick={() => setEditLead(lead)}
-                    className="bg-white rounded-xl p-3 border border-[#E0DEF7] shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing"
+                    className={`bg-white rounded-xl p-3.5 border border-[var(--border-light)] shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.98] active:shadow-lg group ${draggedLead === lead.id ? 'opacity-40' : ''}`}
+                    style={{ animationDelay: `${i * 40}ms` }}
                   >
-                    <p className="font-semibold text-sm text-[#1E1B4B]">{lead.name || 'Sin nombre'}</p>
-                    {lead.business_name && <p className="text-xs text-[#64748B] mt-0.5">{lead.business_name}</p>}
-                    <div className="flex items-center gap-2 mt-2">
-                      {lead.plan_interested && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#F1F0FB] text-[#4F46E5]">
-                          {lead.plan_interested === 'pre_diseno' ? 'Pre-diseño' : lead.plan_interested === 'landing_page' ? 'Landing' : 'Sitio Web'}
-                        </span>
-                      )}
-                      {lead.amount_paid && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-50 text-green-700">
-                          ${lead.amount_paid}
-                        </span>
-                      )}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm text-[var(--dark)] leading-snug">{lead.name || 'Sin nombre'}</p>
+                      <svg className="w-3.5 h-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                     </div>
+                    {lead.business_name && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{lead.business_name}</p>}
+
+                    <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+                      {lead.plan_interested && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">
+                          {PLAN_LABELS[lead.plan_interested] || lead.plan_interested}
+                        </span>
+                      )}
+                      {lead.amount_paid ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
+                      ) : lead.amount_quoted ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span>
+                      ) : null}
+                    </div>
+
                     {lead.ref_code && (
-                      <p className="text-[10px] text-[#94A3B8] mt-1.5 font-mono">{lead.ref_code}</p>
+                      <p className="text-[9px] text-[var(--text-muted)] mt-2 font-mono tracking-wider opacity-60">{lead.ref_code}</p>
                     )}
                   </div>
                 ))}
                 {stageLeads.length === 0 && (
-                  <p className="text-xs text-[#94A3B8] text-center py-6">Sin leads</p>
+                  <div className="text-center py-8 opacity-40">
+                    <p className="text-xs text-[var(--text-muted)]">Vacío</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -176,86 +166,37 @@ export default function PipelinePage() {
         })}
       </div>
 
-      {/* New Lead Modal */}
-      {showNewLead && (
-        <NewLeadModal
-          onClose={() => setShowNewLead(false)}
-          onSave={async (data) => {
-            await supabase.from('leads').insert(data)
-            setShowNewLead(false)
-            fetchData()
-          }}
-        />
-      )}
-
-      {/* Link Ref Code Modal */}
-      {showLinkRef && (
-        <LinkRefModal
-          supabase={supabase}
-          onClose={() => setShowLinkRef(false)}
-          onLinked={() => { setShowLinkRef(false); fetchData() }}
-        />
-      )}
-
-      {/* Edit Lead Modal */}
-      {editLead && (
-        <EditLeadModal
-          lead={editLead}
-          stages={stages}
-          supabase={supabase}
-          onClose={() => setEditLead(null)}
-          onSave={async (data) => {
-            await supabase.from('leads').update(data).eq('id', editLead.id)
-            setEditLead(null)
-            fetchData()
-          }}
-        />
-      )}
+      {/* Modals */}
+      {showNewLead && <NewLeadModal onClose={() => setShowNewLead(false)} onSave={async (data) => { await supabase.from('leads').insert(data); setShowNewLead(false); fetchData() }} />}
+      {showLinkRef && <LinkRefModal supabase={supabase} onClose={() => setShowLinkRef(false)} onLinked={() => { setShowLinkRef(false); fetchData() }} />}
+      {editLead && <EditLeadModal lead={editLead} stages={stages} supabase={supabase} onClose={() => setEditLead(null)} onSave={async (data) => { await supabase.from('leads').update(data).eq('id', editLead.id); setEditLead(null); fetchData() }} />}
     </div>
   )
 }
 
-// ── New Lead Modal ──────────────────────────────────
+// ── New Lead Modal ──
 function NewLeadModal({ onClose, onSave }: { onClose: () => void; onSave: (data: Record<string, unknown>) => void }) {
-  const [form, setForm] = useState({
-    name: '', phone: '', business_name: '', source_channel: 'landing_page',
-    plan_interested: '', notes: '',
-  })
-
-  function set(key: string, val: string) {
-    setForm(prev => ({ ...prev, [key]: val }))
-  }
+  const [form, setForm] = useState({ name: '', phone: '', business_name: '', source_channel: 'landing_page', plan_interested: '', notes: '' })
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   return (
-    <Modal title="Nuevo Lead" onClose={onClose}>
+    <Modal title="Nuevo Lead" icon="👤" onClose={onClose}>
       <div className="space-y-4">
-        <Input label="Nombre" value={form.name} onChange={v => set('name', v)} />
+        <Input label="Nombre" value={form.name} onChange={v => set('name', v)} autoFocus />
         <Input label="Teléfono" value={form.phone} onChange={v => set('phone', v)} />
         <Input label="Negocio" value={form.business_name} onChange={v => set('business_name', v)} />
-        <Select label="Canal" value={form.source_channel} onChange={v => set('source_channel', v)} options={[
-          { value: 'landing_page', label: 'Landing Page' },
-          { value: 'instagram_dm', label: 'Instagram DM' },
-          { value: 'referral', label: 'Referido' },
-          { value: 'organic_wa', label: 'WhatsApp directo' },
-          { value: 'meta_ads_direct', label: 'Meta Ads' },
-          { value: 'other', label: 'Otro' },
-        ]} />
+        <Select label="Canal de origen" value={form.source_channel} onChange={v => set('source_channel', v)} options={Object.entries(SOURCE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
         <Select label="Plan interesado" value={form.plan_interested} onChange={v => set('plan_interested', v)} options={[
-          { value: '', label: 'Sin definir' },
-          { value: 'pre_diseno', label: 'Pre-diseño ($50)' },
-          { value: 'landing_page', label: 'Landing Page ($150)' },
-          { value: 'sitio_web', label: 'Sitio Web ($250)' },
+          { value: '', label: 'Sin definir' }, ...Object.entries(PLAN_LABELS).map(([v, l]) => ({ value: v, label: l })),
         ]} />
         <Textarea label="Notas" value={form.notes} onChange={v => set('notes', v)} />
-        <button onClick={() => onSave(form)} className="w-full py-2.5 rounded-xl bg-[#4F46E5] text-white font-semibold text-sm hover:bg-[#6366F1] transition-all cursor-pointer">
-          Crear lead
-        </button>
+        <BtnPrimary onClick={() => onSave({ ...form, plan_interested: form.plan_interested || null, notes: form.notes || null })}>Crear lead</BtnPrimary>
       </div>
     </Modal>
   )
 }
 
-// ── Link Ref Code Modal ─────────────────────────────
+// ── Link Ref Code Modal ──
 function LinkRefModal({ supabase, onClose, onLinked }: { supabase: ReturnType<typeof createClient>; onClose: () => void; onLinked: () => void }) {
   const [refCode, setRefCode] = useState('')
   const [result, setResult] = useState<string | null>(null)
@@ -263,135 +204,75 @@ function LinkRefModal({ supabase, onClose, onLinked }: { supabase: ReturnType<ty
   const [sessionData, setSessionData] = useState<Record<string, string> | null>(null)
 
   async function handleLink() {
-    setLoading(true)
-    setResult(null)
-
-    const code = refCode.trim().toUpperCase()
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('ref_code', code)
-      .single()
-
+    setLoading(true); setResult(null)
+    const code = refCode.trim()
+    const { data: session } = await supabase.from('sessions').select('*').eq('ref_code', code).single()
     if (!session) {
-      // Try lowercase
-      const { data: session2 } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('ref_code', refCode.trim())
-        .single()
-
-      if (!session2) {
-        setResult('No se encontró ninguna sesión con ese código')
-        setLoading(false)
-        return
-      }
+      const { data: session2 } = await supabase.from('sessions').select('*').eq('ref_code', code.toUpperCase()).single()
+      if (!session2) { setResult('No se encontró sesión con ese código'); setLoading(false); return }
       setSessionData(session2)
-    } else {
-      setSessionData(session)
-    }
+    } else { setSessionData(session) }
     setLoading(false)
   }
 
   async function createFromSession() {
     if (!sessionData) return
-
-    // Determine plan from CTA click events
-    const { data: ctaEvents } = await supabase
-      .from('events')
-      .select('event_data')
-      .eq('session_id', sessionData.id)
-      .eq('event_type', 'cta_click')
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    const plan = ctaEvents?.[0]?.event_data?.plan || null
-
-    // Determine source channel from UTMs
+    const { data: ctaEvents } = await supabase.from('events').select('event_data').eq('session_id', sessionData.id).eq('event_type', 'cta_click').order('created_at', { ascending: false }).limit(1)
+    const plan = (ctaEvents?.[0]?.event_data as Record<string, string>)?.plan || null
     let source_channel = 'landing_page'
-    if (sessionData.utm_source === 'facebook' || sessionData.utm_source === 'instagram' || sessionData.utm_source === 'meta') {
-      source_channel = 'meta_ads_direct'
-    }
-
-    const leadData = {
-      ref_code: sessionData.ref_code,
-      source_channel,
-      plan_interested: plan && plan !== 'generic' ? plan : null,
-    }
-
-    const { data: lead } = await supabase.from('leads').insert(leadData).select().single()
-
+    if (['facebook', 'instagram', 'meta'].includes(sessionData.utm_source)) source_channel = 'meta_ads_direct'
+    const { data: lead } = await supabase.from('leads').insert({ ref_code: sessionData.ref_code, source_channel, plan_interested: plan && plan !== 'generic' ? plan : null }).select().single()
     if (lead) {
       await supabase.from('sessions').update({ lead_id: lead.id }).eq('id', sessionData.id)
-      setResult(`Lead creado y vinculado. Fuente: ${source_channel}${plan ? ', Plan: ' + plan : ''}`)
-      setTimeout(onLinked, 1500)
+      setResult('Lead creado y vinculado')
+      setTimeout(onLinked, 1200)
     }
   }
 
   return (
-    <Modal title="Vincular ref code" onClose={onClose}>
-      <p className="text-sm text-[#64748B] mb-4">
-        Ingresa el código <span className="font-mono font-bold">[ref:TW-xxxx]</span> del mensaje de WhatsApp
-      </p>
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={refCode}
-          onChange={e => setRefCode(e.target.value)}
-          placeholder="TW-a3f2"
-          className="flex-1 px-4 py-2.5 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-[#1E1B4B] text-sm font-mono focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15"
-        />
-        <button
-          onClick={handleLink}
-          disabled={loading || !refCode.trim()}
-          className="px-5 py-2.5 rounded-xl bg-[#059669] text-white font-semibold text-sm hover:bg-[#047857] transition-all disabled:opacity-50 cursor-pointer"
-        >
+    <Modal title="Vincular ref code" icon="🔗" onClose={onClose}>
+      <p className="text-sm text-[var(--text-secondary)] mb-4">Ingresa el código <code className="bg-[var(--bg-alt)] px-1.5 py-0.5 rounded text-[var(--primary)] font-mono font-bold text-xs">[ref:TW-xxxx]</code> del mensaje de WhatsApp</p>
+      <div className="flex gap-2 mb-5">
+        <input type="text" value={refCode} onChange={e => setRefCode(e.target.value)} placeholder="TW-a3f2"
+          className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--dark)] text-sm font-mono font-bold tracking-wider placeholder:text-[var(--text-muted)] placeholder:font-normal transition-all" autoFocus />
+        <button onClick={handleLink} disabled={loading || !refCode.trim()}
+          className="px-6 py-3 rounded-xl bg-[var(--green)] text-white font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-40 cursor-pointer active:scale-[0.97]">
           {loading ? '...' : 'Buscar'}
         </button>
       </div>
 
       {sessionData && !result && (
-        <div className="bg-[#F1F0FB] rounded-xl p-4 mb-4 space-y-2">
-          <p className="text-sm font-semibold text-[#1E1B4B]">Sesión encontrada:</p>
-          <div className="text-xs text-[#64748B] space-y-1">
-            <p>Dispositivo: <strong className="text-[#1E1B4B]">{sessionData.device_type || 'desconocido'}</strong></p>
-            {sessionData.utm_source && <p>UTM Source: <strong className="text-[#1E1B4B]">{sessionData.utm_source}</strong></p>}
-            {sessionData.utm_campaign && <p>Campaña: <strong className="text-[#1E1B4B]">{sessionData.utm_campaign}</strong></p>}
-            {sessionData.referrer && <p>Referrer: <strong className="text-[#1E1B4B]">{sessionData.referrer}</strong></p>}
-            <p>Fecha: <strong className="text-[#1E1B4B]">{new Date(sessionData.first_seen_at).toLocaleString('es-VE')}</strong></p>
+        <div className="bg-[var(--bg-alt)] rounded-xl p-4 mb-4 border border-[var(--border-light)] animate-fade-in-scale">
+          <p className="text-xs font-bold text-[var(--primary)] uppercase tracking-wider font-[Space_Grotesk,sans-serif] mb-3">Sesión encontrada</p>
+          <div className="grid grid-cols-2 gap-2 text-xs mb-4">
+            <InfoChip label="Dispositivo" value={sessionData.device_type || 'N/A'} />
+            {sessionData.utm_source && <InfoChip label="UTM Source" value={sessionData.utm_source} />}
+            {sessionData.utm_campaign && <InfoChip label="Campaña" value={sessionData.utm_campaign} />}
+            <InfoChip label="Fecha" value={new Date(sessionData.first_seen_at).toLocaleString('es-VE')} />
+            {sessionData.referrer && <InfoChip label="Referrer" value={sessionData.referrer} />}
           </div>
-          <button
-            onClick={createFromSession}
-            className="w-full mt-3 py-2 rounded-xl bg-[#4F46E5] text-white font-semibold text-sm hover:bg-[#6366F1] transition-all cursor-pointer"
-          >
-            Crear lead desde esta sesión
-          </button>
+          <BtnPrimary onClick={createFromSession}>Crear lead desde esta sesión</BtnPrimary>
         </div>
       )}
 
-      {result && (
-        <p className={`text-sm text-center py-2 ${result.includes('No se') ? 'text-red-500' : 'text-green-600'}`}>{result}</p>
-      )}
+      {result && <p className={`text-sm text-center py-3 font-semibold animate-fade-in ${result.includes('No se') ? 'text-red-500' : 'text-emerald-600'}`}>{result}</p>}
     </Modal>
   )
 }
 
-// ── Edit Lead Modal ─────────────────────────────────
+// ── Edit Lead Modal ──
 function EditLeadModal({ lead, stages, supabase, onClose, onSave }: {
-  lead: Lead; stages: Stage[]; supabase: ReturnType<typeof createClient>;
+  lead: Lead; stages: Stage[]; supabase: ReturnType<typeof createClient>
   onClose: () => void; onSave: (data: Record<string, unknown>) => void
 }) {
   const [form, setForm] = useState({
-    name: lead.name || '',
-    phone: lead.phone || '',
-    business_name: lead.business_name || '',
-    current_stage: lead.current_stage,
-    plan_interested: lead.plan_interested || '',
-    amount_quoted: lead.amount_quoted?.toString() || '',
-    amount_paid: lead.amount_paid?.toString() || '',
+    name: lead.name || '', phone: lead.phone || '', business_name: lead.business_name || '',
+    current_stage: lead.current_stage, plan_interested: lead.plan_interested || '',
+    amount_quoted: lead.amount_quoted?.toString() || '', amount_paid: lead.amount_paid?.toString() || '',
     notes: lead.notes || '',
   })
   const [sessionInfo, setSessionInfo] = useState<Record<string, string> | null>(null)
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   useEffect(() => {
     if (lead.ref_code) {
@@ -400,70 +281,60 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave }: {
     }
   }, [lead.ref_code, supabase])
 
-  function set(key: string, val: string) {
-    setForm(prev => ({ ...prev, [key]: val }))
-  }
-
   return (
-    <Modal title="Detalle del lead" onClose={onClose}>
+    <Modal title="Detalle del lead" icon="📋" onClose={onClose} wide>
       <div className="space-y-4">
-        <Input label="Nombre" value={form.name} onChange={v => set('name', v)} />
-        <Input label="Teléfono" value={form.phone} onChange={v => set('phone', v)} />
-        <Input label="Negocio" value={form.business_name} onChange={v => set('business_name', v)} />
-        <Select label="Etapa" value={form.current_stage} onChange={v => set('current_stage', v)}
-          options={stages.map(s => ({ value: s.slug, label: s.label }))}
-        />
-        <Select label="Plan" value={form.plan_interested} onChange={v => set('plan_interested', v)} options={[
-          { value: '', label: 'Sin definir' },
-          { value: 'pre_diseno', label: 'Pre-diseño' },
-          { value: 'landing_page', label: 'Landing Page' },
-          { value: 'sitio_web', label: 'Sitio Web' },
-        ]} />
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Monto cotizado ($)" value={form.amount_quoted} onChange={v => set('amount_quoted', v)} type="number" />
-          <Input label="Monto pagado ($)" value={form.amount_paid} onChange={v => set('amount_paid', v)} type="number" />
+          <Input label="Nombre" value={form.name} onChange={v => set('name', v)} />
+          <Input label="Teléfono" value={form.phone} onChange={v => set('phone', v)} />
+        </div>
+        <Input label="Negocio" value={form.business_name} onChange={v => set('business_name', v)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Select label="Etapa" value={form.current_stage} onChange={v => set('current_stage', v)} options={stages.map(s => ({ value: s.slug, label: s.label }))} />
+          <Select label="Plan" value={form.plan_interested} onChange={v => set('plan_interested', v)} options={[{ value: '', label: 'Sin definir' }, ...Object.entries(PLAN_LABELS).map(([v, l]) => ({ value: v, label: l }))]} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Cotizado ($)" value={form.amount_quoted} onChange={v => set('amount_quoted', v)} type="number" />
+          <Input label="Pagado ($)" value={form.amount_paid} onChange={v => set('amount_paid', v)} type="number" />
         </div>
         <Textarea label="Notas" value={form.notes} onChange={v => set('notes', v)} />
 
         {sessionInfo && (
-          <div className="bg-[#F1F0FB] rounded-xl p-3">
-            <p className="text-xs font-bold text-[#4F46E5] uppercase tracking-wider mb-2">Info de sesión</p>
-            <div className="text-xs text-[#64748B] space-y-1">
-              <p>Dispositivo: {sessionInfo.device_type}</p>
-              {sessionInfo.utm_source && <p>Fuente: {sessionInfo.utm_source}</p>}
-              {sessionInfo.utm_campaign && <p>Campaña: {sessionInfo.utm_campaign}</p>}
-              <p>Fecha visita: {new Date(sessionInfo.first_seen_at).toLocaleString('es-VE')}</p>
+          <div className="bg-gradient-to-br from-[var(--bg-alt)] to-[var(--bg)] rounded-xl p-4 border border-[var(--border-light)]">
+            <p className="text-[10px] font-bold text-[var(--primary)] uppercase tracking-wider font-[Space_Grotesk,sans-serif] mb-2.5">Datos de sesión</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <InfoChip label="Dispositivo" value={sessionInfo.device_type || 'N/A'} />
+              {sessionInfo.utm_source && <InfoChip label="Fuente" value={sessionInfo.utm_source} />}
+              {sessionInfo.utm_campaign && <InfoChip label="Campaña" value={sessionInfo.utm_campaign} />}
+              <InfoChip label="Visita" value={new Date(sessionInfo.first_seen_at).toLocaleString('es-VE')} />
             </div>
           </div>
         )}
 
-        <button
-          onClick={() => onSave({
-            ...form,
-            amount_quoted: form.amount_quoted ? parseFloat(form.amount_quoted) : null,
-            amount_paid: form.amount_paid ? parseFloat(form.amount_paid) : null,
-            plan_interested: form.plan_interested || null,
-          })}
-          className="w-full py-2.5 rounded-xl bg-[#4F46E5] text-white font-semibold text-sm hover:bg-[#6366F1] transition-all cursor-pointer"
-        >
-          Guardar cambios
-        </button>
+        <BtnPrimary onClick={() => onSave({
+          ...form,
+          amount_quoted: form.amount_quoted ? parseFloat(form.amount_quoted) : null,
+          amount_paid: form.amount_paid ? parseFloat(form.amount_paid) : null,
+          plan_interested: form.plan_interested || null,
+          notes: form.notes || null,
+        })}>Guardar cambios</BtnPrimary>
       </div>
     </Modal>
   )
 }
 
-// ── Shared UI Components ────────────────────────────
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+// ── Shared UI ──
+function Modal({ title, icon, onClose, wide, children }: { title: string; icon?: string; onClose: () => void; wide?: boolean; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-[#E0DEF7]">
-          <h2 className="font-bold text-lg text-[#1E1B4B]">{title}</h2>
-          <button onClick={onClose} className="text-[#94A3B8] hover:text-[#1E1B4B] transition-colors cursor-pointer">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className={`bg-white rounded-2xl w-full ${wide ? 'max-w-lg' : 'max-w-md'} max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-scale border border-[var(--border-light)]`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)]">
+          <div className="flex items-center gap-2.5">
+            {icon && <span className="text-xl">{icon}</span>}
+            <h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] transition-colors cursor-pointer p-1 rounded-lg hover:bg-[var(--bg-alt)]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
         <div className="p-5">{children}</div>
@@ -472,12 +343,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+function Input({ label, value, onChange, type = 'text', autoFocus }: { label: string; value: string; onChange: (v: string) => void; type?: string; autoFocus?: boolean }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-sm text-[#1E1B4B] focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15" />
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} autoFocus={autoFocus}
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all duration-200" />
     </div>
   )
 }
@@ -485,9 +356,9 @@ function Input({ label, value, onChange, type = 'text' }: { label: string; value
 function Textarea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
       <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
-        className="w-full px-3 py-2 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-sm text-[#1E1B4B] focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15 resize-none" />
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all duration-200 resize-none" />
     </div>
   )
 }
@@ -495,11 +366,28 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-sm text-[#1E1B4B] focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15">
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all duration-200">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+    </div>
+  )
+}
+
+function BtnPrimary({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98]">
+      {children}
+    </button>
+  )
+}
+
+function InfoChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-white rounded-lg px-2.5 py-1.5 border border-[var(--border-light)]">
+      <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
+      <p className="text-xs font-semibold text-[var(--dark)] truncate">{value}</p>
     </div>
   )
 }
