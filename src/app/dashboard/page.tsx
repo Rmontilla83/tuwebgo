@@ -83,7 +83,7 @@ export default async function DashboardPage() {
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">
           Dashboard
         </h1>
@@ -111,8 +111,8 @@ export default async function DashboardPage() {
               const maxCount = Math.max(...Object.values(m.stageCounts), 1)
               const width = Math.max((count / maxCount) * 100, 6)
               return (
-                <div key={stage.slug} className="flex items-center gap-3 group">
-                  <span className="text-xs text-[var(--text-secondary)] w-28 sm:w-36 text-right flex-shrink-0 font-medium">{stage.label}</span>
+                <div key={stage.slug} className="flex items-center gap-2 sm:gap-3 group">
+                  <span className="text-[11px] sm:text-xs text-[var(--text-secondary)] w-20 sm:w-36 text-right flex-shrink-0 font-medium truncate">{stage.label}</span>
                   <div className="flex-1 bg-[var(--bg-alt)] rounded-full h-8 overflow-hidden relative">
                     <div
                       className="h-full bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-full flex items-center justify-end pr-3 bar-fill group-hover:brightness-110 transition-all"
@@ -163,8 +163,8 @@ export default async function DashboardPage() {
       </div>
 
       {/* Recent Leads */}
-      <div className="mt-6 bg-[var(--card)] rounded-2xl p-5 sm:p-6 border border-[var(--border)] shadow-sm card-hover">
-        <div className="flex items-center gap-2 mb-5">
+      <div className="mt-6 bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm card-hover">
+        <div className="flex items-center gap-2 mb-4 sm:mb-5">
           <div className="w-1 h-5 rounded-full gradient-bar"></div>
           <h2 className="text-sm font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] uppercase tracking-wider">Leads recientes</h2>
         </div>
@@ -175,32 +175,59 @@ export default async function DashboardPage() {
             <p className="text-xs text-[var(--text-muted)] mt-1">Cuando registres un lead en Pipeline, aparecerá aquí</p>
           </div>
         ) : (
-          <div className="overflow-x-auto -mx-5 sm:-mx-6 px-5 sm:px-6">
-            <table className="w-full text-sm min-w-[600px]">
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  {['Nombre','Negocio','Plan','Canal','Etapa'].map(h => (
-                    <th key={h} className="text-left py-2.5 px-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider font-[Space_Grotesk,sans-serif]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="stagger">
-                {m.recentLeads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-alt)]/50 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-[var(--dark)]">{lead.name || 'Sin nombre'}</td>
-                    <td className="py-3 px-3 text-[var(--text-secondary)]">{lead.business_name || '—'}</td>
-                    <td className="py-3 px-3 text-[var(--text-secondary)]">{lead.plan_interested ? ({ pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' } as Record<string, string>)[lead.plan_interested] || lead.plan_interested : '—'}</td>
-                    <td className="py-3 px-3">{SOURCE_ICONS[lead.source_channel] || '📌'}</td>
-                    <td className="py-3 px-3">
-                      <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold border ${STAGE_COLORS[lead.current_stage] || 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-                        {m.stages.find(s => s.slug === lead.current_stage)?.label || lead.current_stage}
+          <>
+            {/* Mobile: cards */}
+            <div className="sm:hidden space-y-2.5 stagger">
+              {m.recentLeads.map((lead) => (
+                <div key={lead.id} className="bg-[var(--bg)] rounded-xl p-3.5 border border-[var(--border-light)]">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name || 'Sin nombre'}</p>
+                      {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
+                    </div>
+                    <span className={`inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${STAGE_COLORS[lead.current_stage] || 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                      {m.stages.find(s => s.slug === lead.current_stage)?.label || lead.current_stage}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs">{SOURCE_ICONS[lead.source_channel] || '📌'}</span>
+                    {lead.plan_interested && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--card)] text-[var(--primary)] border border-[var(--border-light)]">
+                        {({ pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' } as Record<string, string>)[lead.plan_interested] || lead.plan_interested}
                       </span>
-                    </td>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop: table */}
+            <div className="hidden sm:block overflow-x-auto -mx-6 px-6">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    {['Nombre','Negocio','Plan','Canal','Etapa'].map(h => (
+                      <th key={h} className="text-left py-2.5 px-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider font-[Space_Grotesk,sans-serif]">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="stagger">
+                  {m.recentLeads.map((lead) => (
+                    <tr key={lead.id} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-alt)]/50 transition-colors">
+                      <td className="py-3 px-3 font-semibold text-[var(--dark)]">{lead.name || 'Sin nombre'}</td>
+                      <td className="py-3 px-3 text-[var(--text-secondary)]">{lead.business_name || '—'}</td>
+                      <td className="py-3 px-3 text-[var(--text-secondary)]">{lead.plan_interested ? ({ pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' } as Record<string, string>)[lead.plan_interested] || lead.plan_interested : '—'}</td>
+                      <td className="py-3 px-3">{SOURCE_ICONS[lead.source_channel] || '📌'}</td>
+                      <td className="py-3 px-3">
+                        <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold border ${STAGE_COLORS[lead.current_stage] || 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                          {m.stages.find(s => s.slug === lead.current_stage)?.label || lead.current_stage}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

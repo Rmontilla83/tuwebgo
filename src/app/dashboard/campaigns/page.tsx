@@ -106,40 +106,41 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1E1B4B]">Campañas</h1>
-          <p className="text-sm text-[#64748B] mt-1">{campaigns.length} campañas registradas</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Campañas</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">{campaigns.length} campañas registradas</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowUtm(true)} className="px-4 py-2 rounded-xl border border-[#E0DEF7] text-sm font-semibold text-[#4F46E5] hover:bg-[#F1F0FB] transition-all cursor-pointer">
-            Generador UTM
+          <button onClick={() => setShowUtm(true)} className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs sm:text-sm font-semibold text-[var(--primary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer">
+            UTM
           </button>
-          <button onClick={() => setShowNew(true)} className="px-4 py-2 rounded-xl bg-[#4F46E5] text-white text-sm font-semibold hover:bg-[#6366F1] transition-all cursor-pointer">
-            + Nueva campaña
+          <button onClick={() => setShowNew(true)} className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-xs sm:text-sm font-semibold hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20">
+            + Campaña
           </button>
         </div>
       </div>
 
       {/* Campaigns Table */}
       {campaigns.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 border border-[#E0DEF7] text-center">
-          <p className="text-[#94A3B8]">No hay campañas. Crea tu primera campaña para empezar a trackear gastos y ROI.</p>
+        <div className="bg-[var(--card)] rounded-2xl p-12 border border-[var(--border)] text-center">
+          <p className="text-4xl mb-3">📢</p>
+          <p className="text-[var(--text-muted)]">No hay campañas. Crea tu primera para trackear gastos y ROI.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {campaigns.map((c) => {
             const m2 = metrics[c.id] || { total_spend: 0, total_leads: 0, won_leads: 0, revenue: 0, cpl: 0, cac: 0, roi: 0 }
             return (
-              <div key={c.id} className="bg-white rounded-2xl border border-[#E0DEF7] shadow-sm overflow-hidden">
-                <div className="p-5">
+              <div key={c.id} className="bg-[var(--card)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
+                <div className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${PLATFORM_COLORS[c.platform] || 'bg-gray-100 text-gray-600'}`}>
                         {PLATFORM_LABELS[c.platform] || c.platform}
                       </span>
-                      <h3 className="font-bold text-[#1E1B4B]">{c.name}</h3>
+                      <h3 className="font-bold text-[var(--dark)] text-sm sm:text-base">{c.name}</h3>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                         c.status === 'active' ? 'bg-green-100 text-green-700' :
                         c.status === 'paused' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
@@ -148,16 +149,16 @@ export default function CampaignsPage() {
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setShowExpense(c.id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E0DEF7] text-[#64748B] hover:bg-[#F1F0FB] transition-all cursor-pointer">
+                      <button onClick={() => setShowExpense(c.id)} className="px-3 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer active:scale-[0.97]">
                         + Gasto
                       </button>
-                      <button onClick={() => setEditCampaign(c)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E0DEF7] text-[#64748B] hover:bg-[#F1F0FB] transition-all cursor-pointer">
+                      <button onClick={() => setEditCampaign(c)} className="px-3 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer active:scale-[0.97]">
                         Editar
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
                     <MetricBox label="Gasto" value={`$${m2.total_spend.toFixed(0)}`} />
                     <MetricBox label="Leads" value={m2.total_leads.toString()} />
                     <MetricBox label="Ventas" value={m2.won_leads.toString()} />
@@ -167,7 +168,7 @@ export default function CampaignsPage() {
                   </div>
 
                   {c.utm_campaign && (
-                    <p className="text-[10px] text-[#94A3B8] mt-3 font-mono">utm_campaign={c.utm_campaign}</p>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-3 font-mono truncate">utm_campaign={c.utm_campaign}</p>
                   )}
                 </div>
               </div>
@@ -221,9 +222,9 @@ export default function CampaignsPage() {
 
 function MetricBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="bg-[#FAFAFE] rounded-xl p-3 text-center">
-      <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">{label}</p>
-      <p className={`text-lg font-bold ${color || 'text-[#1E1B4B]'} mt-0.5`}>{value}</p>
+    <div className="bg-[var(--bg)] rounded-xl p-2 sm:p-3 text-center">
+      <p className="text-[8px] sm:text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
+      <p className={`text-sm sm:text-lg font-bold ${color || 'text-[var(--dark)]'} mt-0.5 font-[Space_Grotesk,sans-serif]`}>{value}</p>
     </div>
   )
 }
@@ -259,7 +260,7 @@ function CampaignModal({ title, initial, onClose, onSave }: {
         </div>
         <Select label="Estado" value={form.status} onChange={v => set('status', v)} options={Object.entries(STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
         <Textarea label="Notas" value={form.notes} onChange={v => set('notes', v)} />
-        <button onClick={() => onSave({ ...form, end_date: form.end_date || null, utm_campaign: form.utm_campaign || null, notes: form.notes || null })} className="w-full py-2.5 rounded-xl bg-[#4F46E5] text-white font-semibold text-sm hover:bg-[#6366F1] transition-all cursor-pointer">
+        <button onClick={() => onSave({ ...form, end_date: form.end_date || null, utm_campaign: form.utm_campaign || null, notes: form.notes || null })} className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98]">
           Guardar
         </button>
       </div>
@@ -301,26 +302,26 @@ function ExpenseModal({ campaignId, supabase, onClose, onSaved }: {
   return (
     <Modal title="Gastos de campaña" onClose={onClose}>
       <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Input label="Monto ($)" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} type="number" />
           <Input label="Fecha" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} type="date" />
-          <Input label="Descripción" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} />
         </div>
-        <button onClick={addExpense} className="w-full py-2 rounded-xl bg-[#059669] text-white font-semibold text-sm hover:bg-[#047857] transition-all cursor-pointer">
+        <Input label="Descripción" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} />
+        <button onClick={addExpense} className="w-full py-2.5 rounded-xl bg-[var(--green)] text-white font-semibold text-sm hover:brightness-110 transition-all cursor-pointer active:scale-[0.98]">
           Agregar gasto
         </button>
 
         {expenses.length > 0 && (
           <div>
             <div className="flex justify-between items-center mb-2">
-              <p className="text-xs font-bold text-[#64748B] uppercase">Historial</p>
-              <p className="text-sm font-bold text-[#1E1B4B]">Total: ${total.toFixed(2)}</p>
+              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">Historial</p>
+              <p className="text-sm font-bold text-[var(--dark)]">Total: ${total.toFixed(2)}</p>
             </div>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {expenses.map(e => (
-                <div key={e.id} className="flex justify-between items-center bg-[#FAFAFE] rounded-lg px-3 py-2 text-sm">
-                  <span className="text-[#64748B]">{e.expense_date} {e.description && `— ${e.description}`}</span>
-                  <span className="font-bold text-[#1E1B4B]">${Number(e.amount).toFixed(2)}</span>
+                <div key={e.id} className="flex justify-between items-center bg-[var(--bg)] rounded-lg px-3 py-2.5 text-sm gap-2">
+                  <span className="text-[var(--text-secondary)] text-xs truncate">{e.expense_date} {e.description && `— ${e.description}`}</span>
+                  <span className="font-bold text-[var(--dark)] flex-shrink-0">${Number(e.amount).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -358,7 +359,7 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Generador de Links UTM" onClose={onClose}>
+    <Modal title="Generador UTM" onClose={onClose}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Select label="Source" value={form.source} onChange={v => setForm(f => ({ ...f, source: v }))} options={[
@@ -373,28 +374,28 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
         </div>
         <Input label="Campaign" value={form.campaign} onChange={v => setForm(f => ({ ...f, campaign: v }))} placeholder="ej: abril-caracas-landing" />
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Content (opcional)" value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} placeholder="ej: video-1" />
-          <Input label="Term (opcional)" value={form.term} onChange={v => setForm(f => ({ ...f, term: v }))} placeholder="ej: pagina-web" />
+          <Input label="Content" value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} placeholder="ej: video-1" />
+          <Input label="Term" value={form.term} onChange={v => setForm(f => ({ ...f, term: v }))} placeholder="ej: pagina-web" />
         </div>
 
         <div className="space-y-3 mt-2">
           <div>
-            <p className="text-xs font-bold text-[#64748B] uppercase mb-1">Link para landing page</p>
-            <div className="flex gap-2">
-              <code className="flex-1 bg-[#FAFAFE] rounded-lg px-3 py-2 text-xs text-[#1E1B4B] break-all border border-[#E0DEF7]">{landingUrl}</code>
-              <button onClick={() => copy(landingUrl, 'landing')} className="px-3 py-2 rounded-lg bg-[#4F46E5] text-white text-xs font-semibold flex-shrink-0 cursor-pointer">
-                {copied === 'landing' ? '✓' : 'Copiar'}
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">Link landing</p>
+              <button onClick={() => copy(landingUrl, 'landing')} className="px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white text-[10px] font-semibold cursor-pointer active:scale-[0.95]">
+                {copied === 'landing' ? '✓ Copiado' : 'Copiar'}
               </button>
             </div>
+            <code className="block bg-[var(--bg)] rounded-xl px-3 py-2.5 text-[11px] text-[var(--dark)] break-all border border-[var(--border)] leading-relaxed">{landingUrl}</code>
           </div>
           <div>
-            <p className="text-xs font-bold text-[#64748B] uppercase mb-1">Link directo a WhatsApp (sin landing)</p>
-            <div className="flex gap-2">
-              <code className="flex-1 bg-[#FAFAFE] rounded-lg px-3 py-2 text-xs text-[#1E1B4B] break-all border border-[#E0DEF7]">{waUrl}</code>
-              <button onClick={() => copy(waUrl, 'wa')} className="px-3 py-2 rounded-lg bg-[#25D366] text-white text-xs font-semibold flex-shrink-0 cursor-pointer">
-                {copied === 'wa' ? '✓' : 'Copiar'}
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">WhatsApp directo</p>
+              <button onClick={() => copy(waUrl, 'wa')} className="px-3 py-1.5 rounded-lg bg-[var(--green-wa)] text-white text-[10px] font-semibold cursor-pointer active:scale-[0.95]">
+                {copied === 'wa' ? '✓ Copiado' : 'Copiar'}
               </button>
             </div>
+            <code className="block bg-[var(--bg)] rounded-xl px-3 py-2.5 text-[11px] text-[var(--dark)] break-all border border-[var(--border)] leading-relaxed">{waUrl}</code>
           </div>
         </div>
       </div>
@@ -405,24 +406,29 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
 // ── Shared UI Components ────────────────────────────
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-[#E0DEF7]">
-          <h2 className="font-bold text-lg text-[#1E1B4B]">{title}</h2>
-          <button onClick={onClose} className="text-[#94A3B8] hover:text-[#1E1B4B] cursor-pointer"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 overflow-y-auto" style={{pointerEvents:'none'}}>
+        <div className="flex min-h-full items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl animate-fade-in-scale border border-[var(--border-light)]" style={{pointerEvents:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)]">
+              <h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2>
+              <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer p-1.5 rounded-lg hover:bg-[var(--bg-alt)]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <div className="p-5 max-h-[70vh] overflow-y-auto">{children}</div>
+          </div>
         </div>
-        <div className="p-5">{children}</div>
       </div>
-    </div>
+    </>
   )
 }
 
 function Input({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full px-3 py-2 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-sm text-[#1E1B4B] focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15" />
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all" />
     </div>
   )
 }
@@ -430,9 +436,9 @@ function Input({ label, value, onChange, type = 'text', placeholder }: { label: 
 function Textarea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">{label}</label>
-      <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
-        className="w-full px-3 py-2 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-sm text-[#1E1B4B] focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15 resize-none" />
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
+      <textarea value={value} onChange={e => onChange(e.target.value)} rows={2}
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all resize-none" />
     </div>
   )
 }
@@ -440,9 +446,9 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl border border-[#E0DEF7] bg-[#FAFAFE] text-sm text-[#1E1B4B] focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15">
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </div>
