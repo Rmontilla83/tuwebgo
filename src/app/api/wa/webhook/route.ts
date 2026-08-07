@@ -205,25 +205,15 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
     await db.from('wa_conversations').update(parche).eq('id', convId)
   }
 
-  // Cierra el bucle de atribución: el mensaje trae [ref:TW-xxxx] del pixel.
-  if (cuerpo) await enlazarPorRefCode(db, convId as string, cuerpo)
-}
-
-/** Si el mensaje trae un ref code, ata la conversación al lead de esa sesión. */
-async function enlazarPorRefCode(db: Db, convId: string, texto: string) {
-  const ref = extractRefCode(texto)
-  if (!ref) return
-
-  const { data: conv } = await db
-    .from('wa_conversations').select('lead_id').eq('id', convId).single()
-  if (conv?.lead_id) return // ya tiene lead, no lo pisamos
-
-  const { data: sesion } = await db
-    .from('sessions').select('lead_id').eq('ref_code', ref).single()
-
-  if (sesion?.lead_id) {
-    await db.from('wa_conversations').update({ lead_id: sesion.lead_id }).eq('id', convId)
-  }
+  // Cierra el bucle de atribución en las dos direcciones: crea el lead si no
+  // existe, engancha la conversación, y ata la sesión web al lead para no
+  // perder UTMs, dispositivo ni referrer. Todo en una transacción.
+  const { error: attrErr } = await db.rpc('wa_cerrar_atribucion', {
+    p_conv_id: convId,
+    p_ref_code: cuerpo ? extractRefCode(cuerpo) : null,
+    p_nombre: nombrePerfil,
+  })
+  if (attrErr) console.error('[wa-webhook] atribución:', attrErr.message)
 }
 
 async function actualizarEstado(db: Db, s: MetaEstado) {
