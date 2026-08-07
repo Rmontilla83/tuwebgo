@@ -16,40 +16,67 @@
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Normaliza un teléfono venezolano a E.164 sin el "+" (formato que espera wa.me).
- * Acepta: 04141234567 · 0414-123-4567 · +58 414 1234567 · 584141234567 · 4141234567
- * Devuelve null si no es un móvil venezolano válido.
+ * Normaliza un teléfono a E.164 sin el "+" (formato que espera wa.me).
  *
- * REGLA: en Venezuela los móviles empiezan por 4 (04xx) y los fijos por 2 (02xx).
- * Validamos por eso y NO por una lista de prefijos.
+ * Prioriza el formato venezolano, pero ACEPTA NÚMEROS INTERNACIONALES.
+ *   04141234567 · 0414-123-4567 · +58 414 1234567 · 4141234567 → 584141234567
+ *   +52 1 333 787 1310                                          → 5213337871310
  *
- * La primera versión usaba la lista ['412','414','416','424','426'] y dejó fuera
- * al 0422 — que es justamente el prefijo del número que TuWebGo registró en Meta,
- * más 5 leads de la base. Una lista blanca de prefijos envejece cada vez que
- * CONATEL asigna uno nuevo, y el modo de falla es el peor posible: rechazar en
- * silencio el número de un cliente real. Aceptar un 4xx inexistente no cuesta
- * nada — WhatsApp simplemente no entrega.
+ * Dos correcciones que costaron un mensaje perdido cada una:
+ *
+ * 1. La v1 usaba la lista ['412','414','416','424','426'] y rechazaba el 0422 —
+ *    el prefijo del número que TuWebGo registró en Meta. Ahora la regla es
+ *    estructural: móviles venezolanos empiezan por 4, fijos por 2.
+ *
+ * 2. La v2 seguía siendo solo-Venezuela y descartó un mensaje real entrante
+ *    desde México (521...). A un WhatsApp de negocio le escribe cualquiera:
+ *    venezolanos desde Colombia, España, Chile. Rechazarlos hacía que el
+ *    mensaje nunca llegara al inbox.
+ *
+ * Ambigüedad conocida y aceptada: 10 dígitos que empiezan por 4 se leen como
+ * venezolanos, así que un número de EE.UU. con código de área 4xx escrito sin
+ * prefijo de país se interpretaría mal. No afecta a los entrantes —Meta siempre
+ * manda E.164 completo— y para carga manual en un negocio venezolano es la
+ * lectura correcta el 99% de las veces.
  */
 export function normalizePhoneVE(raw: string | null | undefined): string | null {
   if (!raw) return null
-  let d = raw.replace(/\D/g, '')
+  const d = raw.replace(/\D/g, '')
+  if (!d) return null
 
-  if (d.startsWith('58')) d = d.slice(2)        // +58 / 58
-  else if (d.startsWith('0')) d = d.slice(1)    // 0414...
+  // ── Venezuela ──
+  // Con 0 delante es formato nacional: solo puede ser venezolano.
+  if (d.startsWith('0')) {
+    const local = d.slice(1)
+    return local.length === 10 && local[0] === '4' ? `58${local}` : null
+  }
+  // +58 / 58 con móvil detrás
+  if (d.startsWith('58') && d.length === 12 && d[2] === '4') return d
+  // 10 dígitos sueltos que arrancan en 4
+  if (d.length === 10 && d[0] === '4') return `58${d}`
 
-  // Quedan 10 dígitos: prefijo(3) + número(7), y el prefijo arranca en 4.
-  if (d.length !== 10) return null
-  if (d[0] !== '4') return null
+  // ── Internacional ──
+  // E.164 admite de 8 a 15 dígitos contando el código de país.
+  if (d.length >= 8 && d.length <= 15) return d
 
-  return `58${d}`
+  return null
 }
 
-/** Formato legible: 0414-123.4567 */
+/** true si el número es venezolano (para decidir el formato de presentación). */
+export function esVenezolano(e164: string | null | undefined): boolean {
+  return !!e164 && e164.length === 12 && e164.startsWith('58') && e164[2] === '4'
+}
+
+/** Formato legible: 0414-123.4567 para Venezuela, +52 1333787 1310 para el resto. */
 export function formatPhoneVE(raw: string | null | undefined): string {
   const n = normalizePhoneVE(raw)
   if (!n) return raw || '—'
-  const d = n.slice(2)
-  return `0${d.slice(0, 3)}-${d.slice(3, 6)}.${d.slice(6)}`
+  if (esVenezolano(n)) {
+    const d = n.slice(2)
+    return `0${d.slice(0, 3)}-${d.slice(3, 6)}.${d.slice(6)}`
+  }
+  // Sin saber el largo del código de país, mostramos E.164 con separación simple.
+  return `+${n.slice(0, n.length - 7)} ${n.slice(-7)}`
 }
 
 /** Link wa.me con el mensaje precargado. Devuelve null si el teléfono no sirve. */
