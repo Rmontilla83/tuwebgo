@@ -4,7 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 
-const GRAPH = process.env.GRAPH_API_VERSION || 'v22.0'
+// Alineado con la versión que Meta usa para los webhooks de esta app (v26.0).
+// Conviene mantener envío y recepción en la misma versión: los formatos de
+// payload y los códigos de error cambian entre versiones.
+// Se puede sobreescribir con GRAPH_API_VERSION sin tocar código.
+const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 
 /**
  * POST /api/wa/send — envía por la Cloud API y registra el mensaje.
