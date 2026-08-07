@@ -63,6 +63,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
   const [borrador, setBorrador] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [redactando, setRedactando] = useState(false)
+  const [enviando, setEnviando] = useState(false)
   const finRef = useRef<HTMLDivElement>(null)
 
   const conv = convs.find((c) => c.id === activa) ?? null
@@ -151,20 +152,58 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
     }
   }
 
-  async function enviar() {
-    if (!conv || !borrador.trim()) return
-    const texto = borrador.trim()
-    const link = waLink(conv.phone_e164, texto)
+  /** Abre wa.me y deja constancia. Es el camino de la Fase 0 y el respaldo cuando la ventana está cerrada. */
+  async function enviarPorDeeplink(texto: string) {
+    const link = waLink(conv!.phone_e164, texto)
     if (!link) { setError('El teléfono de la conversación no es válido.'); return }
-
     // window.open síncrono ANTES del await, o el navegador bloquea el popup.
     window.open(link, '_blank', 'noopener,noreferrer')
-    setBorrador('')
-
     const { error: err } = await supabase.rpc('wa_log_deeplink', {
-      p_phone: conv.phone_e164, p_body: texto, p_lead_id: conv.lead_id, p_template: null,
+      p_phone: conv!.phone_e164, p_body: texto, p_lead_id: conv!.lead_id, p_template: null,
     })
     if (err) setError(`Se abrió WhatsApp pero no se registró el mensaje: ${err.message}`)
+  }
+
+  async function enviar() {
+    if (!conv || !borrador.trim() || enviando) return
+    const texto = borrador.trim()
+    setError(null)
+
+    // Sin ventana abierta la API rechaza el texto libre, así que ni lo intentamos.
+    if (!v.abierta) {
+      setBorrador('')
+      await enviarPorDeeplink(texto)
+      return
+    }
+
+    setEnviando(true)
+    try {
+      const res = await fetch('/api/wa/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conv.id, texto }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        setBorrador('')
+        if (data.aviso) setError(data.aviso)
+        return
+      }
+
+      // 503 = faltan credenciales de Meta · 409 = ventana cerrada.
+      // En ambos casos el deep-link sigue funcionando, así que no te quedas trancado.
+      if (res.status === 503 || data.codigo === 'VENTANA_CERRADA') {
+        setBorrador('')
+        await enviarPorDeeplink(texto)
+        return
+      }
+      setError(data.error ?? `Error ${res.status}`)
+    } catch {
+      setError('No se pudo conectar. Intentá de nuevo.')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   const filtradas = convs.filter((c) => {
@@ -327,10 +366,11 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                   />
                   <button
                     onClick={enviar}
-                    disabled={!borrador.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]"
+                    disabled={!borrador.trim() || enviando}
+                    title={v.abierta ? 'Se envía por la API de WhatsApp' : 'Ventana cerrada: se abre WhatsApp para que lo mandes vos'}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] whitespace-nowrap"
                   >
-                    Abrir WA
+                    {enviando ? 'Enviando…' : v.abierta ? 'Enviar' : 'Abrir WA'}
                   </button>
                 </div>
               </div>
