@@ -62,6 +62,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
   const [error, setError] = useState<string | null>(null)
   const [borrador, setBorrador] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [redactando, setRedactando] = useState(false)
   const finRef = useRef<HTMLDivElement>(null)
 
   const conv = convs.find((c) => c.id === activa) ?? null
@@ -117,6 +118,38 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
   }, [activa, supabase])
 
   useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes.length])
+
+  /** Pide a Gemini el borrador de la próxima respuesta. No envía nada: llena el textarea. */
+  async function sugerir() {
+    if (!conv || redactando) return
+    setRedactando(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead: {
+            nombre: conv.leads?.name,
+            negocio: conv.leads?.business_name,
+            etapa: conv.leads?.current_stage,
+          },
+          conversacion: mensajes.map((m) => ({
+            autor: m.direction === 'out' ? 'rafael' : 'cliente',
+            texto: m.body ?? `[${m.msg_type}]`,
+          })),
+          instruccion: borrador.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? `Error ${res.status}`); return }
+      setBorrador(data.texto)
+    } catch {
+      setError('No se pudo conectar con el asistente.')
+    } finally {
+      setRedactando(false)
+    }
+  }
 
   async function enviar() {
     if (!conv || !borrador.trim()) return
@@ -259,7 +292,20 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
               </div>
 
               <div className="p-3 border-t border-[var(--border-light)]">
-                <div className="flex gap-2 mb-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-2 mb-2 overflow-x-auto items-center" style={{ scrollbarWidth: 'none' }}>
+                  <button
+                    onClick={sugerir}
+                    disabled={redactando}
+                    title="Gemini redacta el borrador con el contexto del lead y la conversación. Lo revisás y lo mandás vos."
+                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--primary)] text-white text-[11px] font-semibold hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-all"
+                  >
+                    {redactando ? (
+                      <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />Redactando…</>
+                    ) : (
+                      <>✨ Sugerir{borrador.trim() && ' con mi indicación'}</>
+                    )}
+                  </button>
+                  <span className="flex-shrink-0 w-px h-4 bg-[var(--border)]" />
                   {templatesForStage(conv.leads?.current_stage ?? 'nuevo').slice(0, 4).map((t) => (
                     <button
                       key={t.id}
