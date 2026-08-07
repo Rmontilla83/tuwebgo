@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
+import WhatsAppPanel from '@/components/WhatsAppPanel'
+import { normalizePhoneVE, waLink, WA_TEMPLATES } from '@/lib/whatsapp'
 
 type Lead = {
   id: string; name: string | null; phone: string | null; business_name: string | null
@@ -364,6 +366,24 @@ function LeadCard({ lead, stages, onClick }: { lead: Lead; stages: Stage[]; onCl
         {lead.plan_interested && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">{PLAN_LABELS[lead.plan_interested]||lead.plan_interested}</span>}
         {lead.amount_paid ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
         : lead.amount_quoted ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span> : null}
+
+        {/* Acceso rápido: abre WhatsApp con la plantilla de la etapa, sin abrir el modal.
+            stopPropagation para que el tap no dispare también el onClick de la tarjeta. */}
+        {normalizePhoneVE(lead.phone) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const tpl = WA_TEMPLATES.find(t => t.stages[0] === lead.current_stage) ?? WA_TEMPLATES[0]
+              const link = waLink(lead.phone, tpl.build({ nombre: lead.name, negocio: lead.business_name, plan: lead.plan_interested, monto: lead.amount_quoted }))
+              if (link) window.open(link, '_blank', 'noopener,noreferrer')
+            }}
+            title="Abrir WhatsApp"
+            aria-label={`Abrir WhatsApp con ${lead.name || 'el lead'}`}
+            className="ml-auto w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center hover:brightness-110 active:scale-95 transition-all cursor-pointer flex-shrink-0"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.82 9.82 0 016.99 2.896 9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -430,21 +450,29 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
   const [newNote, setNewNote] = useState('')
   const [noteType, setNoteType] = useState('note')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [tab, setTab] = useState<'edit'|'timeline'>('edit')
+  const [tab, setTab] = useState<'edit'|'whatsapp'|'timeline'>('edit')
+  const [modalError, setModalError] = useState<string|null>(null)
   const set = (k:string,v:string) => setForm(p=>({...p,[k]:v}))
+
+  const reloadActivities = useCallback(async () => {
+    const {data,error} = await supabase.from('lead_activities').select('*').eq('lead_id',lead.id).order('created_at',{ascending:false})
+    if(error){ setModalError(error.message); return }
+    setActivities(data||[])
+  }, [lead.id, supabase])
 
   useEffect(() => {
     if(lead.ref_code) supabase.from('sessions').select('*').eq('ref_code',lead.ref_code).single().then(({data})=>{if(data)setSessionInfo(data)})
-    supabase.from('lead_activities').select('*').eq('lead_id',lead.id).order('created_at',{ascending:false}).then(({data})=>setActivities(data||[]))
-    supabase.from('stage_transitions').select('from_stage,to_stage,transitioned_at').eq('lead_id',lead.id).order('transitioned_at',{ascending:false}).then(({data})=>setTransitions(data||[]))
+    supabase.from('lead_activities').select('*').eq('lead_id',lead.id).order('created_at',{ascending:false}).then(({data,error})=>{if(error){setModalError(error.message);return}setActivities(data||[])})
+    supabase.from('stage_transitions').select('from_stage,to_stage,transitioned_at').eq('lead_id',lead.id).order('transitioned_at',{ascending:false}).then(({data,error})=>{if(error){setModalError(error.message);return}setTransitions(data||[])})
   }, [lead, supabase])
 
   async function addNote() {
     if(!newNote.trim()) return
-    await supabase.from('lead_activities').insert({lead_id:lead.id,activity_type:noteType,content:newNote.trim()})
+    setModalError(null)
+    const {error} = await supabase.from('lead_activities').insert({lead_id:lead.id,activity_type:noteType,content:newNote.trim()})
+    if(error){ setModalError(`No se pudo guardar la nota: ${error.message}`); return }
     setNewNote('')
-    const {data} = await supabase.from('lead_activities').select('*').eq('lead_id',lead.id).order('created_at',{ascending:false})
-    setActivities(data||[])
+    await reloadActivities()
   }
 
   const age = getDealAge(lead.created_at)
@@ -454,10 +482,31 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-[var(--bg-alt)] p-1 rounded-xl">
         <button onClick={()=>setTab('edit')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='edit'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Datos</button>
+        <button onClick={()=>setTab('whatsapp')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='whatsapp'?'bg-white text-emerald-600 shadow-sm':'text-[var(--text-muted)]'}`}>WhatsApp</button>
         <button onClick={()=>setTab('timeline')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='timeline'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Timeline ({activities.length + transitions.length})</button>
       </div>
 
-      {tab === 'edit' ? (
+      {modalError && (
+        <div className="mb-3 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-xs text-red-600 break-words">{modalError}</p>
+        </div>
+      )}
+
+      {tab === 'whatsapp' ? (
+        <WhatsAppPanel
+          lead={{
+            id: lead.id,
+            name: form.name || lead.name,
+            phone: form.phone || lead.phone,
+            business_name: form.business_name || lead.business_name,
+            plan_interested: form.plan_interested || lead.plan_interested,
+            amount_quoted: form.amount_quoted ? parseFloat(form.amount_quoted) : lead.amount_quoted,
+            current_stage: form.current_stage,
+          }}
+          supabase={supabase}
+          onLogged={reloadActivities}
+        />
+      ) : tab === 'edit' ? (
         <div className="space-y-4">
           <div className="flex items-center gap-3 mb-2 text-xs text-[var(--text-muted)]">
             <span>Creado {age.text}</span>
