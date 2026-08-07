@@ -15,13 +15,20 @@
 // Teléfonos
 // ─────────────────────────────────────────────────────────────
 
-/** Prefijos de móvil venezolanos (sin el 0 inicial). */
-const VE_MOBILE_PREFIXES = ['412', '414', '416', '424', '426']
-
 /**
  * Normaliza un teléfono venezolano a E.164 sin el "+" (formato que espera wa.me).
  * Acepta: 04141234567 · 0414-123-4567 · +58 414 1234567 · 584141234567 · 4141234567
  * Devuelve null si no es un móvil venezolano válido.
+ *
+ * REGLA: en Venezuela los móviles empiezan por 4 (04xx) y los fijos por 2 (02xx).
+ * Validamos por eso y NO por una lista de prefijos.
+ *
+ * La primera versión usaba la lista ['412','414','416','424','426'] y dejó fuera
+ * al 0422 — que es justamente el prefijo del número que TuWebGo registró en Meta,
+ * más 5 leads de la base. Una lista blanca de prefijos envejece cada vez que
+ * CONATEL asigna uno nuevo, y el modo de falla es el peor posible: rechazar en
+ * silencio el número de un cliente real. Aceptar un 4xx inexistente no cuesta
+ * nada — WhatsApp simplemente no entrega.
  */
 export function normalizePhoneVE(raw: string | null | undefined): string | null {
   if (!raw) return null
@@ -30,9 +37,9 @@ export function normalizePhoneVE(raw: string | null | undefined): string | null 
   if (d.startsWith('58')) d = d.slice(2)        // +58 / 58
   else if (d.startsWith('0')) d = d.slice(1)    // 0414...
 
-  // Quedan 10 dígitos: prefijo(3) + número(7)
+  // Quedan 10 dígitos: prefijo(3) + número(7), y el prefijo arranca en 4.
   if (d.length !== 10) return null
-  if (!VE_MOBILE_PREFIXES.includes(d.slice(0, 3))) return null
+  if (d[0] !== '4') return null
 
   return `58${d}`
 }
