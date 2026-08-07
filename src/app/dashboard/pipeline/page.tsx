@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { firstError } from '@/lib/supabase/errors'
 
 type Lead = {
   id: string; name: string | null; phone: string | null; business_name: string | null
@@ -80,13 +81,19 @@ export default function PipelinePage() {
   const [filterChannel, setFilterChannel] = useState('')
   const [filterPlan, setFilterPlan] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    const [{ data: s }, { data: l }] = await Promise.all([
+    const [stagesRes, leadsRes] = await Promise.all([
       supabase.from('pipeline_stages').select('*').order('sort_order'),
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
     ])
-    setStages(s || []); setLeads(l || []); setLoading(false)
+    // Antes: `setLeads(l || [])` — un fallo de RLS se veía igual que "no hay leads".
+    setLoadError(firstError({ etapas: stagesRes, leads: leadsRes }))
+    setStages(stagesRes.data || [])
+    setLeads(leadsRes.data || [])
+    setLoading(false)
   }, [supabase])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -135,15 +142,29 @@ export default function PipelinePage() {
   function scrollBoard(dir: 'left' | 'right') { scrollRef.current?.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' }) }
 
   async function moveToStage(leadId: string, newStage: string) {
+    const previousStage = leads.find(l => l.id === leadId)?.current_stage
     const updates: Record<string, unknown> = { current_stage: newStage }
     const stage = stages.find(s => s.slug === newStage)
     if (stage?.is_won || stage?.is_lost) updates.closed_at = new Date().toISOString()
-    await supabase.from('leads').update(updates).eq('id', leadId)
+
+    setActionError(null)
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, current_stage: newStage } : l))
+
+    const { error } = await supabase.from('leads').update(updates).eq('id', leadId)
+    if (error) {
+      // Rollback. Sin esto la tarjeta se queda movida en pantalla aunque el UPDATE
+      // haya fallado — recargas y volvió a su sitio, sin ninguna explicación.
+      if (previousStage) {
+        setLeads(prev => prev.map(l => l.id === leadId ? { ...l, current_stage: previousStage } : l))
+      }
+      setActionError(`No se pudo mover el lead: ${error.message}`)
+    }
   }
 
   async function deleteLead(leadId: string) {
-    await supabase.from('leads').delete().eq('id', leadId)
+    setActionError(null)
+    const { error } = await supabase.from('leads').delete().eq('id', leadId)
+    if (error) { setActionError(`No se pudo eliminar el lead: ${error.message}`); return }
     setLeads(prev => prev.filter(l => l.id !== leadId)); setEditLead(null)
   }
 
@@ -209,6 +230,38 @@ export default function PipelinePage() {
         </div>
       )}
 
+      {/* Errores visibles: antes fallaban en silencio y parecía "no hay datos" */}
+      {(loadError || actionError) && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 animate-fade-in">
+          <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-red-700">{actionError ? 'La operación falló' : 'No se pudieron cargar los datos'}</p>
+            <p className="text-xs text-red-600 mt-0.5 break-words font-mono">{actionError || loadError}</p>
+          </div>
+          <button onClick={() => { setActionError(null); setLoadError(null) }} className="text-red-400 hover:text-red-600 cursor-pointer flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
+
+      {/* Sin etapas no hay tablero que pintar. Antes el render seguía y la pantalla
+          quedaba literalmente vacía: título, "0 leads", buscador y nada debajo. */}
+      {visibleStages.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-[var(--border)]">
+          <p className="text-4xl mb-3">🗂️</p>
+          <p className="text-sm font-semibold text-[var(--dark)]">No se cargaron las etapas del pipeline</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1.5 max-w-sm mx-auto">
+            La tabla <code className="font-mono">pipeline_stages</code> no devolvió ninguna fila.
+            Suele ser un permiso de RLS o que la sesión expiró.
+          </p>
+          <button onClick={() => { setLoading(true); fetchData() }} className="mt-5 px-5 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer">
+            Reintentar
+          </button>
+        </div>
+      ) : (
+      <>
       {/* ── MOBILE ── */}
       <div className="md:hidden">
         <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-4 px-4" style={{scrollbarWidth:'none'}}>
@@ -272,10 +325,24 @@ export default function PipelinePage() {
           })}
         </div>
       </div>
+      </>
+      )}
 
-      {showNewLead && <NewLeadModal onClose={()=>setShowNewLead(false)} onSave={async d=>{await supabase.from('leads').insert(d);setShowNewLead(false);fetchData()}} />}
+      {showNewLead && <NewLeadModal onClose={()=>setShowNewLead(false)} onSave={async d=>{
+        setActionError(null)
+        const { error } = await supabase.from('leads').insert(d)
+        setShowNewLead(false)
+        if (error) { setActionError(`No se pudo crear el lead: ${error.message}`); return }
+        fetchData()
+      }} />}
       {showLinkRef && <LinkRefModal supabase={supabase} onClose={()=>setShowLinkRef(false)} onLinked={()=>{setShowLinkRef(false);fetchData()}} />}
-      {editLead && <EditLeadModal lead={editLead} stages={stages} supabase={supabase} onClose={()=>setEditLead(null)} onSave={async d=>{await supabase.from('leads').update(d).eq('id',editLead.id);setEditLead(null);fetchData()}} onDelete={()=>deleteLead(editLead.id)} />}
+      {editLead && <EditLeadModal lead={editLead} stages={stages} supabase={supabase} onClose={()=>setEditLead(null)} onSave={async d=>{
+        setActionError(null)
+        const { error } = await supabase.from('leads').update(d).eq('id',editLead.id)
+        setEditLead(null)
+        if (error) { setActionError(`No se pudieron guardar los cambios: ${error.message}`); return }
+        fetchData()
+      }} onDelete={()=>deleteLead(editLead.id)} />}
     </div>
   )
 }

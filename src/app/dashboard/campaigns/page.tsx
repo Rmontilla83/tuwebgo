@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { firstError } from '@/lib/supabase/errors'
 
 type Campaign = {
   id: string
@@ -66,13 +67,21 @@ export default function CampaignsPage() {
   const [showExpense, setShowExpense] = useState<string | null>(null)
   const [showUtm, setShowUtm] = useState(false)
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    const [{ data: campaignsData }, { data: expenses }, { data: leads }] = await Promise.all([
+    const [campaignsRes, expensesRes, leadsRes] = await Promise.all([
       supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('campaign_expenses').select('*'),
       supabase.from('leads').select('campaign_id, current_stage, amount_paid'),
     ])
+
+    // Sin esto un fallo de permisos se veía igual que "no hay campañas".
+    setLoadError(firstError({ campañas: campaignsRes, gastos: expensesRes, leads: leadsRes }))
+
+    const campaignsData = campaignsRes.data
+    const expenses = expensesRes.data
+    const leads = leadsRes.data
 
     setCampaigns(campaignsData || [])
 
@@ -107,6 +116,20 @@ export default function CampaignsPage() {
 
   return (
     <div className="animate-fade-in">
+      {loadError && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 animate-fade-in">
+          <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-red-700">No se pudieron cargar las campañas</p>
+            <p className="text-xs text-red-600 mt-0.5 break-words font-mono">{loadError}</p>
+          </div>
+          <button onClick={() => setLoadError(null)} className="text-red-400 hover:text-red-600 cursor-pointer flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Campañas</h1>
@@ -183,8 +206,9 @@ export default function CampaignsPage() {
           title="Nueva campaña"
           onClose={() => setShowNew(false)}
           onSave={async (data) => {
-            await supabase.from('campaigns').insert(data)
+            const { error } = await supabase.from('campaigns').insert(data)
             setShowNew(false)
+            if (error) { setLoadError(`No se pudo crear la campaña: ${error.message}`); return }
             fetchData()
           }}
         />
@@ -197,8 +221,9 @@ export default function CampaignsPage() {
           initial={editCampaign}
           onClose={() => setEditCampaign(null)}
           onSave={async (data) => {
-            await supabase.from('campaigns').update(data).eq('id', editCampaign.id)
+            const { error } = await supabase.from('campaigns').update(data).eq('id', editCampaign.id)
             setEditCampaign(null)
+            if (error) { setLoadError(`No se pudo guardar la campaña: ${error.message}`); return }
             fetchData()
           }}
         />
@@ -276,23 +301,33 @@ function ExpenseModal({ campaignId, supabase, onClose, onSaved }: {
   onSaved: () => void
 }) {
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [expenseError, setExpenseError] = useState<string | null>(null)
   const [form, setForm] = useState({ amount: '', expense_date: new Date().toISOString().split('T')[0], description: '' })
 
   useEffect(() => {
     supabase.from('campaign_expenses').select('*').eq('campaign_id', campaignId).order('expense_date', { ascending: false })
-      .then(({ data }) => setExpenses(data || []))
+      .then(({ data, error }) => {
+        if (error) { setExpenseError(error.message); return }
+        setExpenses(data || [])
+      })
   }, [campaignId, supabase])
 
   async function addExpense() {
-    if (!form.amount) return
-    await supabase.from('campaign_expenses').insert({
+    const amount = parseFloat(form.amount)
+    if (!form.amount || Number.isNaN(amount)) { setExpenseError('Escribe un monto válido'); return }
+    setExpenseError(null)
+
+    const { error } = await supabase.from('campaign_expenses').insert({
       campaign_id: campaignId,
-      amount: parseFloat(form.amount),
+      amount,
       expense_date: form.expense_date,
       description: form.description || null,
     })
+    if (error) { setExpenseError(`No se pudo registrar el gasto: ${error.message}`); return }
+
     setForm({ amount: '', expense_date: new Date().toISOString().split('T')[0], description: '' })
-    const { data } = await supabase.from('campaign_expenses').select('*').eq('campaign_id', campaignId).order('expense_date', { ascending: false })
+    const { data, error: reloadError } = await supabase.from('campaign_expenses').select('*').eq('campaign_id', campaignId).order('expense_date', { ascending: false })
+    if (reloadError) { setExpenseError(reloadError.message); return }
     setExpenses(data || [])
     onSaved()
   }
@@ -302,6 +337,11 @@ function ExpenseModal({ campaignId, supabase, onClose, onSaved }: {
   return (
     <Modal title="Gastos de campaña" onClose={onClose}>
       <div className="space-y-4">
+        {expenseError && (
+          <div className="px-3 py-2.5 rounded-xl bg-red-50 border border-red-200">
+            <p className="text-xs text-red-600 break-words">{expenseError}</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <Input label="Monto ($)" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} type="number" />
           <Input label="Fecha" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} type="date" />

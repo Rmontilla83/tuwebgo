@@ -1,35 +1,45 @@
 import { createClient } from '@/lib/supabase/server'
+import { assertNoError, startOfMonthVE, monthLabelVE } from '@/lib/supabase/errors'
 
 async function getMetrics() {
   const supabase = await createClient()
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const startOfMonth = startOfMonthVE()
 
-  const [
-    { count: totalSessions },
-    { count: ctaClicks },
-    { count: totalLeads },
-    { data: leads },
-    { data: recentLeads },
-    { data: stages },
-  ] = await Promise.all([
+  const [sessionsRes, ctaRes, leadsCountRes, leadsRes, recentRes, stagesRes] = await Promise.all([
     supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('first_seen_at', startOfMonth),
     supabase.from('events').select('*', { count: 'exact', head: true }).eq('event_type', 'cta_click').gte('created_at', startOfMonth),
     supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth),
     supabase.from('leads').select('current_stage, amount_paid, amount_quoted').gte('created_at', startOfMonth),
     supabase.from('leads').select('id, name, business_name, current_stage, plan_interested, source_channel, created_at').order('created_at', { ascending: false }).limit(8),
-    supabase.from('pipeline_stages').select('*, win_probability').order('sort_order'),
+    supabase.from('pipeline_stages').select('*').order('sort_order'),
   ])
 
+  // Sin esto, un fallo de permisos se vería idéntico a "todo en cero".
+  assertNoError({
+    sesiones: sessionsRes,
+    'clics CTA': ctaRes,
+    'conteo de leads': leadsCountRes,
+    leads: leadsRes,
+    'leads recientes': recentRes,
+    'etapas del pipeline': stagesRes,
+  })
+
+  const totalSessions = sessionsRes.count
+  const ctaClicks = ctaRes.count
+  const totalLeads = leadsCountRes.count
+  const leads = leadsRes.data
+  const recentLeads = recentRes.data
+  const stages = stagesRes.data
+
   const wonLeads = leads?.filter(l => l.current_stage === 'pagado' || l.current_stage === 'entregado') || []
-  const revenue = wonLeads.reduce((sum, l) => sum + (l.amount_paid || 0), 0)
+  const revenue = wonLeads.reduce((sum, l) => sum + Number(l.amount_paid ?? 0), 0)
 
   // Forecast ponderado
   let forecast = 0
   for (const lead of leads || []) {
     if (lead.current_stage === 'perdido') continue
     const prob = stages?.find(s => s.slug === lead.current_stage)?.win_probability || 0
-    forecast += (lead.amount_quoted || 0) * (prob / 100)
+    forecast += Number(lead.amount_quoted ?? 0) * (prob / 100)
   }
   forecast = Math.round(forecast)
 
@@ -70,12 +80,9 @@ const SOURCE_ICONS: Record<string, string> = {
   meta_ads_direct: '📢', organic_wa: '💬', other: '📌',
 }
 
-const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-
 export default async function DashboardPage() {
   const m = await getMetrics()
-  const now = new Date()
-  const monthLabel = `${monthNames[now.getMonth()]} ${now.getFullYear()}`
+  const monthLabel = monthLabelVE()
 
   const clickRate = m.totalSessions > 0 ? ((m.ctaClicks / m.totalSessions) * 100).toFixed(1) : '0'
   const leadRate = m.ctaClicks > 0 ? ((m.totalLeads / m.ctaClicks) * 100).toFixed(1) : '0'

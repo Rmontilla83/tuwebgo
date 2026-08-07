@@ -16,9 +16,26 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('Credenciales incorrectas'); setLoading(false) }
-    else router.push('/dashboard')
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError(
+          error.message === 'Invalid login credentials'
+            ? 'Credenciales incorrectas'
+            : error.message
+        )
+        setLoading(false)
+        return
+      }
+      // router.refresh() sincroniza la cookie de sesión con el servidor ANTES de navegar.
+      // Sin esto el dashboard se renderiza en servidor sin sesión, RLS devuelve 0 filas,
+      // y aterrizas en un dashboard vacío justo después de autenticarte.
+      router.refresh()
+      router.push('/dashboard')
+    } catch {
+      setError('No se pudo conectar con el servidor. Revisa tu conexión.')
+      setLoading(false)
+    }
   }
 
   return (

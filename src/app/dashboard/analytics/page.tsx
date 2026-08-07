@@ -1,4 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { assertNoError } from '@/lib/supabase/errors'
+
+// Techo explícito por query. PostgREST puede truncar en silencio según la
+// config del proyecto; sin un límite declarado no hay forma de saber si una
+// agregación se calculó sobre todas las filas o solo sobre las primeras.
+const MAX_ROWS = 50000
 
 const SOURCE_LABELS: Record<string, string> = {
   landing_page: 'Landing Page',
@@ -18,17 +24,24 @@ const PLAN_LABELS: Record<string, string> = {
 async function getAnalytics() {
   const supabase = await createClient()
 
-  const [
-    { data: sessions },
-    { data: events },
-    { data: leads },
-    { data: ctaEvents },
-  ] = await Promise.all([
-    supabase.from('sessions').select('device_type, utm_source, utm_medium, utm_campaign, referrer, first_seen_at'),
-    supabase.from('events').select('event_type, event_data, session_id').eq('event_type', 'section_visible'),
-    supabase.from('leads').select('source_channel, plan_interested, plan_final, current_stage, amount_paid, campaign_id'),
-    supabase.from('events').select('event_data').eq('event_type', 'cta_click'),
+  const [sessionsRes, eventsRes, leadsRes, ctaRes] = await Promise.all([
+    supabase.from('sessions').select('device_type, utm_source, utm_medium, utm_campaign, referrer, first_seen_at', { count: 'exact' }).limit(MAX_ROWS),
+    supabase.from('events').select('event_type, event_data, session_id').eq('event_type', 'section_visible').limit(MAX_ROWS),
+    supabase.from('leads').select('source_channel, plan_interested, plan_final, current_stage, amount_paid, campaign_id', { count: 'exact' }).limit(MAX_ROWS),
+    supabase.from('events').select('event_data', { count: 'exact' }).eq('event_type', 'cta_click').limit(MAX_ROWS),
   ])
+
+  assertNoError({
+    sesiones: sessionsRes,
+    'eventos de sección': eventsRes,
+    leads: leadsRes,
+    'clics CTA': ctaRes,
+  })
+
+  const sessions = sessionsRes.data
+  const events = eventsRes.data
+  const leads = leadsRes.data
+  const ctaEvents = ctaRes.data
 
   // Channel breakdown
   const channels: Record<string, { leads: number; won: number; revenue: number }> = {}
@@ -70,13 +83,6 @@ async function getAnalytics() {
     sectionViews[section] = (sectionViews[section] || 0) + 1
   }
 
-  // Sessions over time (last 30 days)
-  const dailySessions: Record<string, number> = {}
-  for (const s of sessions || []) {
-    const day = s.first_seen_at.split('T')[0]
-    dailySessions[day] = (dailySessions[day] || 0) + 1
-  }
-
   // UTM sources
   const utmSources: Record<string, number> = {}
   for (const s of sessions || []) {
@@ -86,15 +92,17 @@ async function getAnalytics() {
   }
 
   return {
-    totalSessions: sessions?.length || 0,
-    totalLeads: leads?.length || 0,
-    totalCtaClicks: ctaEvents?.length || 0,
+    // Los totales salen del count exacto del servidor, no del largo del array:
+    // si alguna vez PostgREST trunca, los desgloses se quedan cortos pero los
+    // titulares siguen diciendo la verdad.
+    totalSessions: sessionsRes.count ?? sessions?.length ?? 0,
+    totalLeads: leadsRes.count ?? leads?.length ?? 0,
+    totalCtaClicks: ctaRes.count ?? ctaEvents?.length ?? 0,
     channels,
     devices,
     plans,
     ctaClicks,
     sectionViews,
-    dailySessions,
     utmSources,
   }
 }
