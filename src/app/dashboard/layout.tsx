@@ -4,13 +4,20 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+const ICON_CONFIG = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+
+// Inbox entra como 2ª pestaña. Config sale del bottom bar al menú del header:
+// 6 pestañas no caben en móvil con touch targets decentes (~64px cada una).
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Inicio', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1' },
+  { href: '/dashboard/inbox', label: 'Inbox', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
   { href: '/dashboard/pipeline', label: 'Pipeline', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
   { href: '/dashboard/campaigns', label: 'Campañas', icon: 'M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z' },
   { href: '/dashboard/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { href: '/dashboard/settings', label: 'Config', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
 ]
+
+// Sidebar de escritorio: ahí sí entra Config, hay espacio de sobra.
+const NAV_DESKTOP = [...NAV_ITEMS, { href: '/dashboard/settings', label: 'Config', icon: ICON_CONFIG }]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -52,7 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {NAV_DESKTOP.map((item) => {
             const active = isActive(item.href)
             return (
               <Link
@@ -93,6 +100,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* ── Mobile header (simplified - just logo + page context) ── */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--dark)]/95 glass border-b border-white/[0.06] px-4 h-12 flex items-center justify-center safe-top">
+        {/* Config y Salir viven acá porque el bottom bar ya tiene sus 5 pestañas */}
+        <div className="absolute right-3 flex items-center gap-1">
+          <Link
+            href="/dashboard/settings"
+            aria-label="Configuración"
+            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${pathname.startsWith('/dashboard/settings') ? 'text-white bg-white/10' : 'text-white/40 active:text-white/70'}`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              <path d={ICON_CONFIG} />
+            </svg>
+          </Link>
+          <button
+            onClick={handleLogout}
+            aria-label="Salir"
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/40 active:text-white/70 cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
         <svg viewBox="0 0 130 40" className="h-6" xmlns="http://www.w3.org/2000/svg">
           <rect x="2" y="4" width="32" height="24" rx="5" fill="none" stroke="#A5B4FC" strokeWidth="2.5" opacity="0.8"/>
           <circle cx="9" cy="10" r="1.8" fill="#FF5F57"/>

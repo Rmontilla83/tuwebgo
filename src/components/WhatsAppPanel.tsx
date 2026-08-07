@@ -53,12 +53,29 @@ export default function WhatsAppPanel({
   const phoneOk = normalizePhoneVE(lead.phone) !== null
 
   async function logActivity(kind: string) {
-    const { error: err } = await supabase.from('lead_activities').insert({
-      lead_id: lead.id,
-      activity_type: 'message',
-      content: `${kind} · ${template?.label ?? 'mensaje'}: ${message.replace(/\s+/g, ' ').slice(0, 180)}`,
-    })
-    if (err) { setError(`Se abrió WhatsApp pero no se registró la actividad: ${err.message}`); return }
+    // Dos registros con propósitos distintos:
+    //  · lead_activities  -> timeline del lead ("se le mandó un mensaje")
+    //  · wa_log_deeplink  -> el hilo real, que alimenta /dashboard/inbox
+    // Cuando conectemos la Cloud API, los entrantes caen en las mismas tablas
+    // que este RPC, así que el historial queda continuo.
+    const [act, msg] = await Promise.all([
+      supabase.from('lead_activities').insert({
+        lead_id: lead.id,
+        activity_type: 'message',
+        content: `${kind} · ${template?.label ?? 'mensaje'}: ${message.replace(/\s+/g, ' ').slice(0, 180)}`,
+      }),
+      supabase.rpc('wa_log_deeplink', {
+        p_phone: lead.phone,
+        p_body: message,
+        p_lead_id: lead.id,
+        p_template: template?.id ?? null,
+      }),
+    ])
+
+    if (act.error || msg.error) {
+      setError(`Se abrió WhatsApp pero no se registró del todo: ${(act.error ?? msg.error)!.message}`)
+      return
+    }
     setSent(true)
     onLogged?.()
   }
