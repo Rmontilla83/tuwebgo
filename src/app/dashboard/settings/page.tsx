@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import PlantillasWA from '@/components/PlantillasWA'
+import ControlBot from '@/components/ControlBot'
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -62,11 +64,14 @@ export default function SettingsPage() {
     <div className="animate-fade-in">
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Configuración</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Ajustes de tu cuenta</p>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">Cuenta, asistente y plantillas de WhatsApp</p>
       </div>
 
-      <div className="max-w-md">
-        <div className="bg-white rounded-2xl p-6 border border-[var(--border)] shadow-sm">
+      <div className="max-w-2xl space-y-5">
+        <ControlBot />
+        <PlantillasWA />
+
+        <div className="bg-white rounded-2xl p-6 border border-[var(--border)] shadow-sm max-w-md">
           <div className="flex items-center gap-2 mb-5">
             <div className="w-1 h-5 rounded-full gradient-bar"></div>
             <h2 className="text-sm font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] uppercase tracking-wider">Cambiar contraseña</h2>
