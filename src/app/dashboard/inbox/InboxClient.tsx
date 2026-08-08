@@ -40,6 +40,14 @@ const MOTIVO_LEGIBLE: Record<string, string> = {
   pide_humano: '🙋 Pidió hablar con una persona',
 }
 
+/** Versión corta para la lista, donde el espacio es poco. */
+const ETIQUETA_CORTA: Record<string, string> = {
+  quiere_comprar: '💰 Quiere comprar',
+  queja: '⚠️ Reclamo',
+  fuera_de_alcance: '❓ Fuera de catálogo',
+  pide_humano: '🙋 Pidió una persona',
+}
+
 function horaCorta(iso: string) {
   return new Date(iso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
 }
@@ -72,6 +80,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
   const [error, setError] = useState<string | null>(null)
   const [borrador, setBorrador] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [soloPendientes, setSoloPendientes] = useState(false)
   const [redactando, setRedactando] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [rt, setRt] = useState<'conectando' | 'ok' | 'error' | 'sin-sesion'>('conectando')
@@ -176,6 +185,45 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
 
   useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes.length])
 
+  /**
+   * Red de seguridad: sondeo cada 8 segundos.
+   *
+   * Realtime sigue siendo el camino principal —es instantáneo—, pero depende de
+   * un websocket que puede caerse por red, proxy, suspensión del equipo o un
+   * token vencido, y cuando falla lo hace en silencio. Un inbox que a veces no
+   * muestra los mensajes es peor que uno que tarda 8 segundos siempre.
+   *
+   * Se pausa con la pestaña oculta para no gastar cuota de fondo.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    const sondear = async () => {
+      if (document.visibilityState !== 'visible') return
+      await recargarConvs()
+
+      const abierta = activaRef.current
+      if (!abierta) return
+      const { data, error: err } = await supabase
+        .from('wa_messages').select('*').eq('conversation_id', abierta)
+        .order('created_at', { ascending: true }).range(0, 199)
+      if (err || !data) return
+      // Solo tocamos el estado si de verdad cambió, para no re-renderizar
+      // ni romper el scroll cada 8 segundos.
+      setMensajes((prev) => (prev.length === data.length && prev.at(-1)?.id === (data as Message[]).at(-1)?.id
+        ? prev
+        : (data as Message[])))
+    }
+
+    const arrancar = () => { if (!timer) timer = setInterval(sondear, 8000) }
+    const parar = () => { if (timer) { clearInterval(timer); timer = null } }
+    const onVis = () => { if (document.visibilityState === 'visible') { sondear(); arrancar() } else parar() }
+
+    arrancar()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { parar(); document.removeEventListener('visibilitychange', onVis) }
+  }, [supabase, recargarConvs])
+
   /** Alterna quién atiende: Sofía o Rafael. */
   async function alternarBot(c: Conversation) {
     const activar = !c.bot_activo
@@ -277,7 +325,10 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
     }
   }
 
+  const pendientesHumano = convs.filter((c) => !c.bot_activo && c.handoff_motivo).length
+
   const filtradas = convs.filter((c) => {
+    if (soloPendientes && !(!c.bot_activo && c.handoff_motivo)) return false
     if (!busqueda) return true
     const q = busqueda.toLowerCase()
     return [c.display_name, c.phone_e164, c.leads?.name, c.leads?.business_name]
@@ -338,13 +389,27 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
       <div className="grid lg:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-280px)] min-h-[420px]">
         {/* ── Lista ── */}
         <div className={`bg-[var(--card)] rounded-2xl border border-[var(--border)] flex-col overflow-hidden ${activa ? 'hidden lg:flex' : 'flex'}`}>
-          <div className="p-3 border-b border-[var(--border-light)]">
+          <div className="p-3 border-b border-[var(--border-light)] space-y-2">
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar conversación..."
               className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)]"
             />
+            {pendientesHumano > 0 && (
+              <button
+                onClick={() => setSoloPendientes(!soloPendientes)}
+                className={`w-full px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                  soloPendientes
+                    ? 'bg-amber-400 text-amber-950 border-amber-500'
+                    : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                }`}
+              >
+                {soloPendientes
+                  ? `Viendo solo las ${pendientesHumano} que te esperan · Ver todas`
+                  : `👤 ${pendientesHumano} ${pendientesHumano === 1 ? 'conversación te espera' : 'conversaciones te esperan'}`}
+              </button>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {filtradas.length === 0 ? (
@@ -377,6 +442,13 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                     </span>
                   )}
                 </div>
+
+                {/* Sofía se apartó: acá hay algo que solo vos podés resolver */}
+                {!c.bot_activo && c.handoff_motivo && (
+                  <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-semibold border border-amber-300">
+                    {ETIQUETA_CORTA[c.handoff_motivo] ?? '👤 Te toca a vos'}
+                  </span>
+                )}
               </button>
             ))}
           </div>
