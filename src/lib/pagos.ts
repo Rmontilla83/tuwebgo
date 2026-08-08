@@ -32,17 +32,25 @@ export const BINANCE = {
 }
 
 /**
- * Link de pago de Stripe.
+ * Payment Link de Stripe — SOLO el pre-diseño de $50.
  *
- * Vacío hasta que exista. Un Payment Link de Stripe es una URL fija que se
- * puede mandar por WhatsApp y cobra con tarjeta — la única forma de pago de
- * esta lista que le sirve a un cliente fuera de Venezuela sin cuenta bancaria
- * de EE.UU.
+ * Es la única forma de pago de esta lista que le sirve a alguien fuera de
+ * Venezuela sin cuenta en EE.UU. Cobra con tarjeta y pide el teléfono: sin eso
+ * el pago llega con el nombre del titular de la tarjeta y no hay forma de
+ * saber a qué conversación de WhatsApp corresponde.
  *
- * Vacío = Sofía no lo ofrece. Nunca inventa una URL de pago: un link de cobro
- * falso es lo peor que puede mandar.
+ * MONTO FIJO A PROPÓSITO. Hay un link por monto o no hay ninguno: si Sofía
+ * tuviera que elegir entre cuatro URLs terminaría mandando la equivocada, el
+ * mismo problema que ya nos pasó con el enlace del formulario. Los montos
+ * mayores (Landing $150, Sitio $250, Pro $497) los cierra Rafael a mano.
+ *
+ * Cuenta Stripe: wuipi telecom corp · producto prod_V2LpXAVRimdSop
+ * Vacío = Sofía no ofrece tarjeta. Nunca inventa una URL de cobro.
  */
-export const STRIPE_LINK = ''
+export const STRIPE_LINK = 'https://buy.stripe.com/dRmeVc9yxc1ndhm8wO4Vy06'
+
+/** A qué monto corresponde el link de arriba. Si cambia, cambiar los dos. */
+export const STRIPE_MONTO_USD = 50
 
 /**
  * Formulario del brief.
@@ -105,7 +113,15 @@ export async function bloquePagos(enlaceFormulario?: string): Promise<string> {
       ].join('\n')
 
   const stripe = STRIPE_LINK
-    ? `\nTarjeta de crédito o débito (Stripe)\n  Link de pago: ${STRIPE_LINK}\n`
+    ? [
+        '',
+        `Tarjeta de crédito o débito — SOLO para el pre-diseño de $${STRIPE_MONTO_USD}`,
+        `  ${STRIPE_LINK}`,
+        `  Ese enlace cobra $${STRIPE_MONTO_USD} exactos. NO sirve para ningún otro monto:`,
+        '  si el cliente va a pagar un plan mayor con tarjeta, dile que le pasan',
+        '  el enlace correcto y marca handoff "pide_humano".',
+        '',
+      ].join('\n')
     : ''
 
   const formulario = enlaceFormulario

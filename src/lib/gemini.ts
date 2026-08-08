@@ -15,7 +15,7 @@
  * de Tuwebgolanding/index.html). Cuando cambien los precios se cambian ACÁ.
  */
 
-import { bloquePagos } from '@/lib/pagos'
+import { bloquePagos, STRIPE_LINK } from '@/lib/pagos'
 
 export const MODELO_POR_DEFECTO = 'gemini-2.5-flash'
 export const NOMBRE_BOT = 'Sofía'
@@ -367,6 +367,13 @@ const ESQUEMA_RESPUESTA = {
         'horario, dirección, colores, redes). false en cualquier otro caso. ' +
         'No hace falta que escribas el enlace en el mensaje: se agrega solo.',
     },
+    enviar_link_tarjeta: {
+      type: 'boolean',
+      description:
+        'true SOLO si el cliente va a pagar el pre-diseño de $50 con tarjeta de ' +
+        'crédito o débito. false para cualquier otro monto y para cualquier otra ' +
+        'forma de pago. No escribas el enlace: se agrega solo.',
+    },
     handoff: {
       type: 'string',
       enum: ['ninguno', 'quiere_comprar', 'pago_reportado', 'queja', 'fuera_de_alcance', 'pide_humano'],
@@ -494,11 +501,16 @@ export async function redactarBorrador(opts: {
   let mensaje = crudo
   let handoff: MotivoHandoff = null
   let quiereFormulario = false
+  let quiereTarjeta = false
   try {
-    const j = JSON.parse(crudo) as { mensaje?: string; handoff?: string; enviar_formulario?: boolean }
+    const j = JSON.parse(crudo) as {
+      mensaje?: string; handoff?: string
+      enviar_formulario?: boolean; enviar_link_tarjeta?: boolean
+    }
     if (j.mensaje) mensaje = j.mensaje
     if (j.handoff && j.handoff !== 'ninguno') handoff = j.handoff as MotivoHandoff
     quiereFormulario = j.enviar_formulario === true
+    quiereTarjeta = j.enviar_link_tarjeta === true
   } catch {
     // Si por lo que sea no vino JSON, usamos el texto tal cual y no hay handoff.
   }
@@ -506,24 +518,30 @@ export async function redactarBorrador(opts: {
   let texto = mensaje.replace(/^["“”']|["“”']$/g, '').trim()
 
   /**
-   * El enlace lo pega el código, no el modelo.
+   * Los enlaces los pega el código, no el modelo.
    *
-   * En las pruebas lo mandaba a veces sí y a veces no con el mismo prompt: a
+   * En las pruebas los mandaba a veces sí y a veces no con el mismo prompt: a
    * temperatura 0.75 no hay forma de garantizar que reproduzca una cadena
-   * exacta. Un enlace que falta deja al cliente esperando, y uno con un
-   * carácter cambiado lo manda a un 404. Ninguna de las dos cosas puede quedar
-   * a criterio de un modelo de lenguaje.
+   * exacta. Un enlace que falta deja al cliente esperando ("te paso el enlace"
+   * y nunca llega), y uno con un carácter cambiado lo manda a un 404 — o peor,
+   * si es el de cobro, a ninguna parte con la plata en la mano.
    *
    * Si el modelo ya lo escribió bien, no se toca nada.
    */
-  if ((quiereFormulario || handoff === 'pago_reportado') && opts.enlaceFormulario) {
-    if (!texto.includes(opts.enlaceFormulario)) {
-      // Se le quita cualquier intento propio de escribir la URL, que sería la
-      // versión mal copiada, antes de poner la buena.
-      texto = texto.replace(/https?:\/\/\S*brief\.html\S*/gi, '').replace(/[ \t]+\n/g, '\n').trim()
-      texto += `\n\n${opts.enlaceFormulario}`
-    }
+  const adjuntar = (activo: boolean, url: string | undefined, patronPropio: RegExp) => {
+    if (!activo || !url || texto.includes(url)) return
+    // Se borra cualquier intento propio de escribir la URL —que sería la
+    // versión mal copiada— antes de poner la buena.
+    texto = texto.replace(patronPropio, '').replace(/[ \t]+\n/g, '\n').trim()
+    texto += `\n\n${url}`
   }
+
+  adjuntar(
+    quiereFormulario || handoff === 'pago_reportado',
+    opts.enlaceFormulario,
+    /https?:\/\/\S*brief\.html\S*/gi
+  )
+  adjuntar(quiereTarjeta, STRIPE_LINK || undefined, /https?:\/\/\S*buy\.stripe\.com\S*/gi)
 
   return {
     texto,
