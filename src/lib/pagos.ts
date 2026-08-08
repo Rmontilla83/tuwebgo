@@ -23,9 +23,26 @@ export const PAGO_MOVIL = {
   banco: 'Banco Mercantil',
   codigoBanco: '0105',
   telefono: '0424-8672759',
-  // Prefijo V asumido — corregir acá si la cédula es E.
   cedula: 'V-16.006.905',
 }
+
+export const BINANCE = {
+  usuario: 'rafaelmontilla8@gmail.com',
+  moneda: 'USDT',
+}
+
+/**
+ * Link de pago de Stripe.
+ *
+ * Vacío hasta que exista. Un Payment Link de Stripe es una URL fija que se
+ * puede mandar por WhatsApp y cobra con tarjeta — la única forma de pago de
+ * esta lista que le sirve a un cliente fuera de Venezuela sin cuenta bancaria
+ * de EE.UU.
+ *
+ * Vacío = Sofía no lo ofrece. Nunca inventa una URL de pago: un link de cobro
+ * falso es lo peor que puede mandar.
+ */
+export const STRIPE_LINK = ''
 
 /**
  * Formulario que se le manda al cliente después de que reporta el pago.
@@ -65,27 +82,31 @@ export async function bloquePagos(): Promise<string> {
     ? [
         `TASA BCV DE HOY: Bs. ${bolivares(tasa.bs)} por dólar (publicada el ${fechaCorta(tasa.fecha)}).`,
         '',
-        'MONTOS YA CALCULADOS EN BOLÍVARES — usá estos, NO multipliques vos:',
+        'MONTOS YA CALCULADOS EN BOLÍVARES — usa estos, NO multipliques tú:',
         ...PRECIOS_USD.map((usd) => {
           const etq = ETIQUETA_PRECIO[usd] ? ` (${ETIQUETA_PRECIO[usd]})` : ''
           return `  $${usd}${etq} = Bs. ${bolivares(usd * tasa.bs)}`
         }),
         '',
-        'Si el monto que necesitás no está en esa lista, NO lo calcules: decí el',
-        'precio en dólares y que le confirmás el equivalente en bolívares en un',
+        'Si el monto que necesitas no está en esa lista, NO lo calcules: di el',
+        'precio en dólares y que le confirmas el equivalente en bolívares en un',
         'momento. Equivocar un monto de pago es peor que tardar dos minutos.',
       ].join('\n')
     : [
         'NO HAY TASA BCV DISPONIBLE EN ESTE MOMENTO.',
-        'No inventes una tasa ni un monto en bolívares. Decí el precio en dólares',
-        'y que le confirmás el monto exacto en bolívares al momento de pagar.',
+        'No inventes una tasa ni un monto en bolívares. Di el precio en dólares y',
+        'que le confirmas el monto exacto en bolívares al momento de pagar.',
       ].join('\n')
 
+  const stripe = STRIPE_LINK
+    ? `\nTarjeta de crédito o débito (Stripe)\n  Link de pago: ${STRIPE_LINK}\n`
+    : ''
+
   const formulario = URL_FORMULARIO
-    ? `Mandale este enlace: ${URL_FORMULARIO}`
+    ? `Mándale este enlace: ${URL_FORMULARIO}`
     : [
-        'TODAVÍA NO TENÉS EL ENLACE DEL FORMULARIO CARGADO. No inventes ninguno.',
-        'Decile que ya le mandan el formulario para arrancar con el pre-diseño.',
+        'TODAVÍA NO TIENES EL ENLACE DEL FORMULARIO CARGADO. No inventes ninguno.',
+        'Dile que ya le mandan el formulario para arrancar con el pre-diseño.',
       ].join('\n')
 
   return `
@@ -100,27 +121,47 @@ Pago móvil (en bolívares)
   Teléfono: ${PAGO_MOVIL.telefono}
   Cédula: ${PAGO_MOVIL.cedula}
 
+Binance (${BINANCE.moneda})
+  Usuario: ${BINANCE.usuario}
+${stripe}
 ${conversion}
 
-CUÁNDO DAR LOS DATOS
-Apenas el cliente decida comprar o pregunte cómo pagar. No lo hagas esperar ni
-digas "ya te los paso": los tenés, dáselos. Pasá los dos métodos juntos, son
-cortos, y que elija. Después preguntá por cuál va a pagar.
+CUÁNDO DAR LOS DATOS Y CÓMO
 
-SI PIDE PAYPAL, BINANCE O TRANSFERENCIA
-Esos también se aceptan pero NO tenés los datos cargados. No los inventes.
-Ofrecé Zelle o pago móvil, que son los que tenés a mano, y si insiste decile
-que le pasan los datos enseguida y marcá handoff "pide_humano".
+Apenas el cliente decida comprar o pregunte cómo pagar.
+
+ESCRIBE LOS DATOS COMPLETOS EN EL MENSAJE. Nombrar los métodos sin los datos no
+sirve de nada: obliga al cliente a pedirlos otra vez y ahí se enfría la venta.
+Esto es lo único que puede hacer que esta conversación termine en plata, así que
+acá sí te puedes pasar de las 4 líneas.
+
+  MAL:  "Puedes pagar con Zelle, pago móvil o Binance. ¿Cuál prefieres?"
+        "Te mandamos los datos para el pago."
+
+  BIEN: "Son $50. Por Zelle: ${ZELLE.correo}, a nombre de ${ZELLE.titular}.
+         Por pago móvil son Bs. [monto]: ${PAGO_MOVIL.banco} ${PAGO_MOVIL.codigoBanco},
+         ${PAGO_MOVIL.telefono}, cédula ${PAGO_MOVIL.cedula}.
+         ¿Por cuál lo vas a hacer?"
+
+Manda Zelle y pago móvil juntos, que son los que usa casi todo el mundo.
+Binance${STRIPE_LINK ? ' y el link de tarjeta' : ''} solo si el cliente lo pide
+o si te dice que está fuera de Venezuela.
+
+SI PIDE UNA FORMA DE PAGO QUE NO ESTÁ EN ESTA LISTA
+No la inventes. Ofrece las que sí tienes y, si insiste, dile que le pasan los
+datos enseguida y marca handoff "pide_humano".
+NO ofrecemos PayPal. Si lo pide, dile que no lo manejamos y ofrécele Zelle,
+Binance o pago móvil.
 
 CUANDO EL CLIENTE DIGA QUE YA PAGÓ
 Pasa apenas mande una referencia, una captura o un "listo, ya te transferí".
 
-  1. Acusá recibo SIN dar el pago por confirmado. No digas "recibido",
-     "confirmado" ni "ya lo vi": vos no ves la cuenta. Decí que lo están
+  1. Acusa recibo SIN dar el pago por confirmado. No digas "recibido",
+     "confirmado" ni "ya lo vi": tú no ves la cuenta. Di que lo están
      verificando.
-  2. Mandale el formulario para arrancar con el pre-diseño.
+  2. Mándale el formulario para arrancar con el pre-diseño.
      ${formulario.split('\n').join('\n     ')}
-  3. Marcá handoff "pago_reportado".
+  3. Marca handoff "pago_reportado".
 
   MAL:  "Listo, ya recibimos tu pago. Arrancamos."
   BIEN: "Perfecto, ya lo estamos verificando. Mientras tanto llena esto y

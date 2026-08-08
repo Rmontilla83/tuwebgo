@@ -42,7 +42,7 @@ const MOTIVO_LEGIBLE: Record<string, string> = {
   // si hay conversaciones viejas pausadas con este motivo.
   quiere_comprar: 'El cliente quiere comprar — te toca cerrar',
   pago_reportado: 'Dice que ya pagó — verificá que entró antes de arrancar',
-  queja: 'Reclamo — atendelo vos',
+  queja: 'Reclamo — atiéndelo tú',
   fuera_de_alcance: 'Pidió algo fuera del catálogo',
   pide_humano: 'Pidió hablar con una persona',
 }
@@ -266,7 +266,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
     }
   }
 
-  /** Pide a Gemini el borrador. Útil cuando vos estás atendiendo y querés ayuda. */
+  /** Pide a Gemini el borrador. Útil cuando estás atendiendo tú y quieres ayuda. */
   async function sugerir() {
     if (!conv || redactando) return
     setRedactando(true)
@@ -491,7 +491,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                 {c.leads?.business_name && <p className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">{c.leads.business_name}</p>}
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xs text-[var(--text-muted)] truncate flex-1">
-                    {c.last_direction === 'out' && <span>Vos: </span>}
+                    {c.last_direction === 'out' && <span>Tú: </span>}
                     {c.last_message_preview || 'Sin mensajes'}
                   </p>
                   {c.unread_count > 0 && (
@@ -501,10 +501,10 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                   )}
                 </div>
 
-                {/* Sofía se apartó: acá hay algo que solo vos podés resolver */}
+                {/* Sofía se apartó: aquí hay algo que solo puedes resolver tú */}
                 {!c.bot_activo && c.handoff_motivo && (
                   <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-semibold border border-amber-300">
-                    {(() => { const I = ICONO_HANDOFF[c.handoff_motivo!] ?? IconMano; return <><I className="w-3 h-3" />{ETIQUETA_CORTA[c.handoff_motivo!] ?? 'Te toca a vos'}</> })()}
+                    {(() => { const I = ICONO_HANDOFF[c.handoff_motivo!] ?? IconMano; return <><I className="w-3 h-3" />{ETIQUETA_CORTA[c.handoff_motivo!] ?? 'Te toca a ti'}</> })()}
                   </span>
                 )}
               </button>
@@ -542,14 +542,14 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                 </span>
                 <button
                   onClick={() => alternarBot(conv)}
-                  title={conv.bot_activo ? 'Sofía está atendiendo. Tocá para tomar el control.' : 'Vos estás atendiendo. Tocá para que Sofía siga.'}
+                  title={conv.bot_activo ? 'Sofía está atendiendo. Toca para tomar el control.' : 'Estás atendiendo tú. Toca para que Sofía siga.'}
                   className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold flex-shrink-0 border cursor-pointer transition-all ${
                     conv.bot_activo
                       ? 'bg-[var(--primary-glow)] text-[var(--primary)] border-[var(--primary)]/30'
                       : 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border)]'
                   }`}
                 >
-                  <span className="inline-flex items-center gap-1">{conv.bot_activo ? <IconAsistente className="w-3.5 h-3.5" /> : <IconUsuario className="w-3.5 h-3.5" />}{conv.bot_activo ? 'Sofía' : 'Vos'}</span>
+                  <span className="inline-flex items-center gap-1">{conv.bot_activo ? <IconAsistente className="w-3.5 h-3.5" /> : <IconUsuario className="w-3.5 h-3.5" />}{conv.bot_activo ? 'Sofía' : 'Tú'}</span>
                 </button>
               </div>
 
@@ -648,7 +648,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                   <button
                     onClick={sugerir}
                     disabled={redactando}
-                    title="Gemini redacta el borrador con el contexto del lead y la conversación. Lo revisás y lo mandás vos."
+                    title="Gemini redacta el borrador con el contexto del lead y la conversación. Lo revisas y lo mandas tú."
                     className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--primary)] text-white text-[11px] font-semibold hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-all"
                   >
                     {redactando ? (
@@ -680,7 +680,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                   <button
                     onClick={enviar}
                     disabled={!borrador.trim() || enviando}
-                    title={v.abierta ? 'Se envía por la API de WhatsApp' : 'Ventana cerrada: se abre WhatsApp para que lo mandes vos'}
+                    title={v.abierta ? 'Se envía por la API de WhatsApp' : 'Ventana cerrada: se abre WhatsApp para que lo mandes tú'}
                     className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] whitespace-nowrap"
                   >
                     {enviando ? 'Enviando…' : v.abierta ? 'Enviar' : 'Abrir WA'}

@@ -167,7 +167,7 @@ export default async function DashboardPage() {
       {m.teEsperanDetalle.length > 0 && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4">
           <p className="text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-2.5 font-[family-name:var(--font-display)]">
-            Conversaciones esperando por vos
+            Conversaciones esperando por ti
           </p>
           <div className="space-y-1">
             {m.teEsperanDetalle.map((c) => (
@@ -194,7 +194,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-3 gap-3">
           <Mini valor={m.msgsEntrantes} etiqueta="Recibidos" />
           <Mini valor={m.msgsSofia} etiqueta="Respondió Sofía" destacado />
-          <Mini valor={m.msgsRafael} etiqueta="Respondiste vos" />
+          <Mini valor={m.msgsRafael} etiqueta="Respondiste tú" />
         </div>
         {m.msgsSofia + m.msgsRafael > 0 && (
           <p className="text-[11px] text-[var(--text-muted)] mt-3 pt-3 border-t border-[var(--border-light)]">

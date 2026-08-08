@@ -133,7 +133,7 @@ export default function CampanaWhatsApp() {
       }
       await cargar()
     } catch {
-      setError('Se cortó la conexión. Los enviados quedaron registrados; podés retomar.')
+      setError('Se cortó la conexión. Los enviados quedaron registrados; puedes retomar.')
     } finally { setEnviando(null) }
   }
 
@@ -198,7 +198,7 @@ export default function CampanaWhatsApp() {
             </p>
             <p className="text-xs text-[var(--text-secondary)] mt-1">
               {cupoRestante > 0
-                ? `Podés iniciar ${cupoRestante} conversaciones más hoy.`
+                ? `Puedes iniciar ${cupoRestante} conversaciones más hoy.`
                 : 'Cupo agotado. Se libera a medida que pasan las 24 h de cada envío.'}
             </p>
           </div>

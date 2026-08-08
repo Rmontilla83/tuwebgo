@@ -94,8 +94,8 @@ export default function PlantillasWA() {
         <div className="mb-4 px-3 py-3 rounded-xl bg-red-50 border border-red-200">
           <p className="text-sm font-semibold text-red-800">Meta no tiene ninguna plantilla registrada</p>
           <p className="text-xs text-red-700 mt-1">
-            No están &quot;en revisión&quot;: nunca llegaron. Dale a <strong>Subir las {PLANTILLAS.length} a Meta</strong> y
-            mirá el resultado de cada una — ahí sale el motivo si alguna es rechazada.
+            No están &quot;en revisión&quot;: nunca llegaron. Toca <strong>Subir las {PLANTILLAS.length} a Meta</strong> y
+            mira el resultado de cada una — ahí sale el motivo si alguna es rechazada.
           </p>
         </div>
       )}

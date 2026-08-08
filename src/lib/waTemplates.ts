@@ -13,7 +13,7 @@
  * Sobre las categorías: es tentador declarar todo como UTILITY porque cuesta
  * ~6,5x menos ($0,0113 vs $0,0740). Meta revisa el contenido y recategoriza
  * igual — una plantilla que ofrece algo es MARKETING aunque digas otra cosa.
- * Declararla mal solo consigue que el costo cambie cuando no lo esperás.
+ * Declararla mal solo consigue que el costo cambie cuando no lo esperas.
  */
 
 export type PlantillaWA = {
@@ -53,7 +53,7 @@ export const PLANTILLAS: PlantillaWA[] = [
     proposito: 'Aprobó el diseño pero todavía no ha pagado',
     body:
       'Hola {{1}}, quedamos en arrancar con tu {{2}}. Apenas confirmes el pago empezamos de una vez. ' +
-      'Aceptamos Zelle, PayPal, Binance, pago móvil y transferencia, el que te quede más cómodo.',
+      'Aceptamos Zelle, pago móvil, Binance y tarjeta, el que te quede más cómodo.',
     ejemplos: ['Carlos', 'Landing Page'],
   },
   {

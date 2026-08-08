@@ -48,7 +48,7 @@ export default function ControlBot() {
             {activo === null ? 'Cargando…'
               : activo
                 ? `${NOMBRE_BOT} está atendiendo las conversaciones nuevas. Se aparta sola cuando el cliente quiere comprar, se queja o pide hablar con alguien.`
-                : `${NOMBRE_BOT} está apagada. Todos los mensajes te esperan a vos en el Inbox.`}
+                : `${NOMBRE_BOT} está apagada. Todos los mensajes te esperan a ti en el Inbox.`}
           </p>
           {error && <p className="text-xs text-red-600 mt-2 break-words">{error}</p>}
         </div>
@@ -71,8 +71,8 @@ export default function ControlBot() {
 
       {activo && (
         <p className="text-[11px] text-[var(--text-muted)] mt-3 pt-3 border-t border-[var(--border-light)]">
-          Si respondés a mano en una conversación, {NOMBRE_BOT} se calla ahí sola. Para que retome,
-          usá el botón <span className="font-semibold inline-flex items-center gap-1"><IconUsuario className="w-3 h-3" />Vos / <IconAsistente className="w-3 h-3" />{NOMBRE_BOT}</span> en el Inbox.
+          Si respondes a mano en una conversación, {NOMBRE_BOT} se calla ahí sola. Para que retome,
+          usa el botón <span className="font-semibold inline-flex items-center gap-1"><IconUsuario className="w-3 h-3" />Tú / <IconAsistente className="w-3 h-3" />{NOMBRE_BOT}</span> en el Inbox.
         </p>
       )}
     </div>
