@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type ContextoLead, type TurnoConversacion } from '@/lib/gemini'
+import { urlFormulario } from '@/lib/pagos'
 
 export const runtime = 'nodejs'
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     lead?: ContextoLead
     conversacion?: TurnoConversacion[]
     instruccion?: string
+    conversationId?: string
   }
   try {
     body = await request.json()
@@ -50,6 +52,18 @@ export async function POST(request: Request) {
     texto: String(t.texto ?? '').slice(0, 1200),
   }))
 
+  const admin = createAdminClient()
+
+  // Mismo enlace del brief que usaría la respuesta automática. Sin esto el
+  // borrador sugerido sería el único mensaje que no puede pasar el formulario.
+  let enlaceFormulario: string | undefined
+  if (body.conversationId) {
+    const { data: token } = await admin.rpc('brief_token_conversacion', {
+      p_conv_id: body.conversationId,
+    })
+    if (token) enlaceFormulario = urlFormulario(token as string)
+  }
+
   try {
     const { texto, tokensIn, tokensOut, modelo } = await redactarBorrador({
       apiKey,
@@ -57,9 +71,10 @@ export async function POST(request: Request) {
       lead: body.lead ?? {},
       conversacion: recorte,
       instruccionExtra: body.instruccion?.slice(0, 500),
+      enlaceFormulario,
     })
     // El botón Sugerir cuesta igual que una respuesta automática.
-    await createAdminClient().from('ia_uso').insert({
+    await admin.from('ia_uso').insert({
       modelo, contexto: 'borrador', tokens_in: tokensIn, tokens_out: tokensOut,
     })
 

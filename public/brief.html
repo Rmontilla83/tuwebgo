@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4F46E5">
+<title>Cuéntanos de tu negocio · TuWebGo</title>
+<meta name="description" content="Responde unas preguntas rápidas y en 48 horas ves tu página web.">
+<style>
+:root{
+  --indigo:#4F46E5; --indigo-d:#4338CA; --indigo-l:#EEF2FF; --indigo-b:#C7D2FE;
+  --ink:#0F172A; --body:#475569; --mute:#94A3B8;
+  --line:#E2E8F0; --bg:#F8FAFC; --white:#fff;
+  --ok:#059669; --warn:#DC2626;
+  --r:14px; --shadow:0 1px 2px rgba(15,23,42,.05),0 8px 24px -8px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- Layout ---------- */
+.wrap{max-width:600px;margin:0 auto;padding:0 20px;min-height:100dvh;display:flex;flex-direction:column}
+header{padding:18px 0 10px;display:flex;align-items:center;gap:10px}
+.logo{font-weight:800;font-size:17px;letter-spacing:-.02em;color:var(--ink)}
+.logo span{color:var(--indigo)}
+.badge{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--indigo);background:var(--indigo-l);padding:5px 10px;border-radius:99px}
+
+/* progress */
+.pbar{height:5px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:6px}
+.pfill{height:100%;width:0;background:var(--indigo);border-radius:99px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+.pmeta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mute);font-weight:500;margin-bottom:18px}
+
+main{flex:1;padding-bottom:110px}
+
+/* ---------- Steps ---------- */
+.step{display:none;animation:in .32s cubic-bezier(.16,1,.3,1)}
+.step.on{display:block}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.step{animation:none}.pfill{transition:none}}
+
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--indigo);margin-bottom:8px}
+h1{font-size:26px;line-height:1.22;letter-spacing:-.025em;margin:0 0 8px;font-weight:800}
+h2{font-size:22px;line-height:1.25;letter-spacing:-.02em;margin:0 0 8px;font-weight:750}
+.sub{color:var(--body);font-size:15px;margin:0 0 22px}
+.hint{font-size:13px;color:var(--mute);margin-top:8px}
+.optional{font-size:11.5px;font-weight:600;color:var(--mute);background:var(--line);padding:2px 8px;border-radius:99px;vertical-align:middle;margin-left:6px}
+
+/* ---------- Fields ---------- */
+.field{margin-bottom:18px}
+label.lb{display:block;font-size:14.5px;font-weight:650;margin-bottom:7px;color:var(--ink)}
+.lbhint{font-weight:400;color:var(--mute);font-size:13px;display:block;margin-top:2px}
+input[type=text],input[type=email],input[type=tel],textarea,select{
+  width:100%;font:inherit;font-size:16px;padding:13px 14px;border:1.5px solid var(--line);
+  border-radius:var(--r);background:var(--white);color:var(--ink);transition:border-color .15s,box-shadow .15s;
+}
+textarea{resize:vertical;min-height:92px;line-height:1.5}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 4px rgba(79,70,229,.12)}
+input::placeholder,textarea::placeholder{color:#B6C0CE}
+.prefix{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:var(--r);background:var(--white);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.prefix:focus-within{border-color:var(--indigo);box-shadow:0 0 0 4px rgba(79,70,229,.12)}
+.prefix span{padding:0 4px 0 14px;color:var(--mute);font-size:16px;flex-shrink:0}
+.prefix input{border:none!important;box-shadow:none!important;padding-left:2px}
+.suffix{padding:0 14px 0 2px;color:var(--mute);font-size:14px;flex-shrink:0;white-space:nowrap}
+
+/* ---------- Chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:9px}
+.chip{
+  font:inherit;font-size:14.5px;font-weight:550;padding:11px 16px;border-radius:99px;
+  border:1.5px solid var(--line);background:var(--white);color:var(--body);cursor:pointer;
+  transition:all .15s;display:inline-flex;align-items:center;gap:7px;
+}
+.chip:hover{border-color:var(--indigo-b);color:var(--ink)}
+.chip[aria-pressed=true]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.chip .em{display:inline-flex;line-height:1}
+/* Iconos de línea, mismo criterio que el portal: 24x24, stroke 1.8, sin
+   relleno. Heredan currentColor, así que se tiñen solos con el estado del
+   chip — algo que un emoji nunca hace. */
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;
+      stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.card svg.i{width:22px;height:22px}
+
+/* cards (opciones grandes) */
+.cards{display:grid;gap:10px}
+.card{
+  text-align:left;font:inherit;padding:15px 16px;border-radius:var(--r);border:1.5px solid var(--line);
+  background:var(--white);cursor:pointer;transition:all .15s;display:flex;gap:13px;align-items:flex-start;
+}
+.card:hover{border-color:var(--indigo-b)}
+.card[aria-pressed=true]{border-color:var(--indigo);background:var(--indigo-l);box-shadow:0 0 0 3px rgba(79,70,229,.10)}
+.card .ico{display:inline-flex;line-height:1.15;flex-shrink:0}
+/* Aviso de canal único. Va en la portada, antes de que empiece a escribir:
+   decírselo al final, cuando ya mandó todo por WhatsApp, no sirve de nada. */
+.aviso{display:flex;gap:10px;align-items:flex-start;margin-top:16px;padding:13px 14px;
+  border:1px solid #c7d2fe;background:#eef2ff;border-radius:12px;
+  font-size:13.5px;line-height:1.5;color:#3730a3}
+.aviso svg.i{width:17px;height:17px;margin-top:1px;color:#4f46e5}
+.reenvio{margin-bottom:16px;padding:11px 13px;border:1px solid #fcd34d;
+  background:#fffbeb;border-radius:12px;font-size:13px;line-height:1.5;color:#92400e}
+.card .t{font-size:15.5px;font-weight:650;color:var(--ink);display:block}
+.card .d{font-size:13px;color:var(--body);display:block;margin-top:2px}
+
+/* paletas de color */
+.pals{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.pal{padding:13px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--white);cursor:pointer;transition:all .15s;text-align:left;font:inherit}
+.pal:hover{border-color:var(--indigo-b)}
+.pal[aria-pressed=true]{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(79,70,229,.10)}
+.sw{display:flex;gap:5px;margin-bottom:9px}
+.sw i{width:26px;height:26px;border-radius:7px;display:block}
+.pal .t{font-size:13.5px;font-weight:650}
+
+/* servicio repetidor */
+.svc{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+.svc .n{width:26px;height:26px;flex-shrink:0;border-radius:8px;background:var(--indigo-l);color:var(--indigo);font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.linkbtn{background:none;border:none;color:var(--indigo);font:inherit;font-size:14px;font-weight:650;cursor:pointer;padding:6px 0}
+.linkbtn:hover{text-decoration:underline}
+
+/* ---------- Nav ---------- */
+.nav{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to bottom,rgba(248,250,252,0),var(--bg) 26%);padding:22px 20px calc(18px + env(safe-area-inset-bottom))}
+.navin{max-width:600px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.btn{
+  font:inherit;font-size:16px;font-weight:650;padding:14px 26px;border-radius:var(--r);
+  border:1.5px solid transparent;cursor:pointer;transition:all .15s;display:inline-flex;
+  align-items:center;justify-content:center;gap:8px;
+}
+.btn-p{background:var(--indigo);color:#fff;flex:1;box-shadow:0 4px 14px -4px rgba(79,70,229,.5)}
+.btn-p:hover{background:var(--indigo-d)}
+.btn-p:active{transform:translateY(1px)}
+.btn-g{background:var(--white);border-color:var(--line);color:var(--body);padding:14px 18px}
+.btn-g:hover{border-color:var(--mute);color:var(--ink)}
+.btn-w{background:#25D366;color:#fff;width:100%;box-shadow:0 4px 14px -4px rgba(37,211,102,.5)}
+.btn-w:hover{background:#1FBB59}
+.btn-o{background:var(--white);border-color:var(--line);color:var(--ink);width:100%}
+.btn-o:hover{border-color:var(--indigo);color:var(--indigo)}
+
+.err{color:var(--warn);font-size:13.5px;font-weight:550;margin-top:8px;display:none}
+.err.on{display:block}
+input.bad,textarea.bad{border-color:var(--warn)}
+
+/* ---------- Final ---------- */
+.done{text-align:center;padding-top:8px}
+.tick{width:62px;height:62px;border-radius:99px;background:#DCFCE7;color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:31px;margin:0 auto 16px}
+.summary{background:var(--white);border:1.5px solid var(--line);border-radius:var(--r);padding:16px;text-align:left;margin:20px 0;max-height:230px;overflow-y:auto;font-size:13.5px;line-height:1.65;color:var(--body);white-space:pre-wrap;word-break:break-word}
+.stack{display:grid;gap:10px}
+.next{background:var(--indigo-l);border-radius:var(--r);padding:15px 17px;text-align:left;margin-top:22px;font-size:14px;color:#3730A3}
+/* Solo el <b> que titula la caja va en bloque. Antes era `.next b` a secas y
+   cualquier negrita dentro de la lista se partía en tres líneas. */
+.next>b{display:block;margin-bottom:5px;font-size:14.5px;color:#312E81}
+.next ol{margin:0;padding-left:19px}
+.next li{margin:4px 0}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(14px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:50;white-space:nowrap}
+.toast.on{opacity:1;transform:translateX(-50%)}
+footer{text-align:center;font-size:12px;color:var(--mute);padding:14px 0 20px}
+@media(max-width:380px){h1{font-size:23px}h2{font-size:20px}.chip{font-size:14px;padding:10px 14px}.pals{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- Sprite de iconos. Un solo <symbol> por icono y se referencia con <use>:
+     dibujar 30 SVG completos inline pesaría cuatro veces más. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-comida" viewBox="0 0 24 24"><path d="M4 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M6 12v9"/><path d="M17 3c-1.7 0-3 2-3 5s1.3 4 3 4v9"/></symbol>
+<symbol id="i-tienda" viewBox="0 0 24 24"><path d="M3 9h18l-1.5-5.5A1 1 0 0 0 18.5 3h-13a1 1 0 0 0-1 .5L3 9Z"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 20v-5h6v5"/></symbol>
+<symbol id="i-belleza" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5 20 18M8 16.5 20 6"/></symbol>
+<symbol id="i-salud" viewBox="0 0 24 24"><path d="M4 3v6a5 5 0 0 0 10 0V3"/><path d="M2 3h4M12 3h4"/><path d="M9 14v2a4 4 0 0 0 8 0v-1"/><circle cx="18" cy="13" r="2"/></symbol>
+<symbol id="i-maletin" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/></symbol>
+<symbol id="i-llave" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 1 0 4 4l-9.4 9.4a2.1 2.1 0 0 1-3-3l9.4-9.4Z"/></symbol>
+<symbol id="i-birrete" viewBox="0 0 24 24"><path d="M22 9 12 4 2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4.5"/></symbol>
+<symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></symbol>
+<symbol id="i-camara" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2.2l1.3-2h6l1.3 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-pesa" viewBox="0 0 24 24"><path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/></symbol>
+<symbol id="i-estrella" viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.4l6.1-.8L12 3Z"/></symbol>
+<symbol id="i-chispa" viewBox="0 0 24 24"><path d="m12 3 1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4L12 3Z"/><path d="M18 16.5 18.8 19l2.2.8-2.2.8L18 23l-.8-2.4-2.2-.8 2.2-.8.8-2.5Z"/></symbol>
+<symbol id="i-persona" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></symbol>
+<symbol id="i-edificio" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/><path d="M10 21v-3h4v3"/></symbol>
+<symbol id="i-apreton" viewBox="0 0 24 24"><path d="m8 12 3-3 4 4 3-3"/><path d="M3 10.5 7 7l5 4.5"/><path d="M21 10.5 17 7l-2 1.8"/><path d="M12 15.5 9.5 18a1.8 1.8 0 0 1-2.6-2.6"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.5-5A8 8 0 1 1 21 12Z"/></symbol>
+<symbol id="i-telefono" viewBox="0 0 24 24"><path d="M6 3h3l1.8 4.5-2.2 1.4a12 12 0 0 0 5.5 5.5l1.4-2.2L20 14v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 5.2 2 2 0 0 1 6 3Z"/></symbol>
+<symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+<symbol id="i-carrito" viewBox="0 0 24 24"><path d="M2 3h2.5l2.2 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L20 7H5.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></symbol>
+<symbol id="i-formulario" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+<symbol id="i-corazon" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.7-7.5-10A4.5 4.5 0 0 1 12 7.5 4.5 4.5 0 0 1 19.5 10c0 5.3-7.5 10-7.5 10Z"/></symbol>
+<symbol id="i-rayo" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></symbol>
+<symbol id="i-paleta" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 1 9-9c0 2-1.6 2.5-3 2.5h-1.5a2 2 0 0 0-1.3 3.5 1.7 1.7 0 0 1-1.2 3H12Z"/><circle cx="7.5" cy="12" r="1"/><circle cx="9.5" cy="8" r="1"/><circle cx="14" cy="7.5" r="1"/></symbol>
+<symbol id="i-columna" viewBox="0 0 24 24"><path d="M3 21h18M4 9h16M12 3 3 8h18L12 3Z"/><path d="M7 9v11M12 9v11M17 9v11"/></symbol>
+<symbol id="i-hoja" viewBox="0 0 24 24"><path d="M4 20c0-9 5-14 16-15 0 11-5 15-11 15a5 5 0 0 1-5-5Z"/><path d="M9 16c1.5-4 4-6.5 7.5-8"/></symbol>
+<symbol id="i-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></symbol>
+<symbol id="i-foto" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-2 6 5"/></symbol>
+<symbol id="i-documento" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+<symbol id="i-manos" viewBox="0 0 24 24"><path d="M8 13V4.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V3.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 11V5.5a1.5 1.5 0 0 1 3 0V14c0 4-2.7 7-6.5 7S4 18 4 14v-2.5a1.5 1.5 0 0 1 3 0"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></symbol>
+<symbol id="i-candado" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+<header>
+  <div class="logo">Tu<span>Web</span>Go</div>
+  <div class="badge" id="badge">≈ 4 minutos</div>
+</header>
+
+<div class="pbar"><div class="pfill" id="pfill"></div></div>
+<div class="pmeta"><span id="pnum"></span><span id="plabel"></span></div>
+
+<main>
+
+<!-- 0 · INTRO -->
+<section class="step on" data-step="0">
+  <div id="aviso_enviado" class="reenvio" style="display:none">
+    Ya recibimos un brief con este enlace. Si lo llenas otra vez nos llega como
+    una corrección y trabajamos con lo último que nos mandes.
+  </div>
+  <p id="hola" class="eyebrow" style="display:none"></p>
+  <h1>Cuéntanos de tu negocio y armamos tu página.</h1>
+  <p class="sub">Son <b>9 pasos cortos</b>, la mayoría de un toque. No necesitas saber nada técnico ni tener textos listos — de eso nos encargamos nosotros.</p>
+  <div class="next" style="margin-top:0">
+    <b>Cómo va a funcionar</b>
+    <ol>
+      <li>Respondes esto (≈ 4 min)</li>
+      <li>Al terminar tocas <b>Enviar</b> y nos llega de una vez</li>
+      <li>En 48 horas ves tu página antes de pagar el resto</li>
+    </ol>
+  </div>
+  <div class="aviso">
+    <svg class="i" aria-hidden="true"><use href="#i-candado"/></svg>
+    <span><b>Este formulario es el único canal.</b> No nos mandes la información
+    del negocio por WhatsApp: se pierde entre los mensajes y termina retrasando
+    tu pre-diseño. Todo lo que necesitamos está en estos 9 pasos.</span>
+  </div>
+  <p class="hint">Se guarda solo mientras lo llenas. Si cierras la página, al volver por este mismo enlace sigues donde ibas.</p>
+</section>
+
+<!-- 1 · NEGOCIO -->
+<section class="step" data-step="1">
+  <div class="eyebrow">Lo básico</div>
+  <h2>Empecemos por tu negocio</h2>
+  <p class="sub">Tal cual quieres que aparezca en la página.</p>
+
+  <div class="field">
+    <label class="lb" for="f_nombre">¿Cómo se llama tu negocio?</label>
+    <input type="text" id="f_nombre" data-req placeholder="Ej: Dulce Aroma Repostería" autocomplete="organization">
+    <div class="err" data-err="f_nombre">Escribe el nombre de tu negocio.</div>
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_que">¿A qué se dedica? Dilo en una frase, como se lo dirías a un amigo.
+      <span class="lbhint">Sin adornos. Justo lo que haces y para quién.</span>
+    </label>
+    <textarea id="f_que" data-req placeholder="Ej: Hacemos tortas y postres por encargo para cumpleaños y matrimonios en Valencia."></textarea>
+    <div class="err" data-err="f_que">Cuéntanos brevemente a qué se dedica.</div>
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_zona">¿En qué ciudad o zona atiendes?</label>
+    <input type="text" id="f_zona" data-req placeholder="Ej: Valencia, Carabobo — y envíos a todo el país" autocomplete="address-level2">
+    <div class="err" data-err="f_zona">Indícanos tu ciudad o zona.</div>
+  </div>
+</section>
+
+<!-- 2 · RUBRO -->
+<section class="step" data-step="2">
+  <div class="eyebrow">Lo básico</div>
+  <h2>¿En cuál de estos encaja mejor?</h2>
+  <p class="sub">Nos ayuda a elegir el estilo y la estructura correcta. Elige el más parecido.</p>
+  <div class="chips" data-single="rubro">
+    <button type="button" class="chip" aria-pressed="false" data-v="Comida / restaurante / repostería"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-comida"/></svg></span>Comida y restaurantes</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Tienda / venta de productos"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-tienda"/></svg></span>Tienda o productos</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Belleza / estética / barbería"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-belleza"/></svg></span>Belleza y estética</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Salud / consultorio / odontología"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-salud"/></svg></span>Salud</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Servicio profesional (abogado, contador, consultor)"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-maletin"/></svg></span>Servicio profesional</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Construcción / reparaciones / técnico"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-llave"/></svg></span>Construcción o técnico</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Educación / cursos / academia"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-birrete"/></svg></span>Educación y cursos</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Inmobiliaria"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-casa"/></svg></span>Inmobiliaria</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Eventos / fotografía"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-camara"/></svg></span>Eventos y fotografía</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Fitness / entrenamiento"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-pesa"/></svg></span>Fitness</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Marca personal"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-estrella"/></svg></span>Marca personal</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Otro"><span class="em"><svg class="i" aria-hidden="true"><use href="#i-chispa"/></svg></span>Otro</button>
+  </div>
+  <div class="err" data-err="rubro">Elige una opción.</div>
+  <div class="field" id="rubro_otro_box" style="display:none;margin-top:18px">
+    <label class="lb" for="f_rubro_otro">Cuéntanos cuál</label>
+    <input type="text" id="f_rubro_otro" placeholder="Ej: Taller de cerámica">
+  </div>
+</section>
+
+<!-- 3 · SERVICIOS -->
+<section class="step" data-step="3">
+  <div class="eyebrow">Qué ofreces</div>
+  <h2>Tus productos o servicios principales</h2>
+  <p class="sub">Los que más vendes o los que más quieres vender. Con 3 nos basta, no hace falta la lista completa.</p>
+  <div id="svcs"></div>
+  <button type="button" class="linkbtn" id="addsvc">+ Agregar otro</button>
+  <div class="err" data-err="svcs">Escribe al menos uno.</div>
+
+  <div class="field" style="margin-top:24px">
+    <label class="lb">¿Mostramos precios en la página?</label>
+    <div class="chips" data-single="precios">
+      <button type="button" class="chip" aria-pressed="false" data-v="Sí, precios exactos">Sí, precios exactos</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Solo 'desde $X'">Solo "desde $X"</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="No mostrar precios">No mostrar</button>
+    </div>
+    <div class="err" data-err="precios">Elige una opción.</div>
+  </div>
+  <div class="field" id="precios_box" style="display:none">
+    <label class="lb" for="f_precios">¿Cuáles? <span class="optional">Opcional</span>
+      <span class="lbhint">Puedes escribirlos rápido, uno por línea.</span>
+    </label>
+    <textarea id="f_precios" placeholder="Torta 20 personas — $45&#10;Mini postres (docena) — $18"></textarea>
+  </div>
+</section>
+
+<!-- 4 · CLIENTE -->
+<section class="step" data-step="4">
+  <div class="eyebrow">A quién le hablas</div>
+  <h2>¿Quién es tu cliente?</h2>
+  <p class="sub">La página le va a hablar a esta persona, no a todo el mundo.</p>
+  <div class="cards" data-single="cliente">
+    <button type="button" class="card" aria-pressed="false" data-v="Personas / consumidor final">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-persona"/></svg></span><span><span class="t">Personas</span><span class="d">Le vendes directo al consumidor final</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Empresas / negocios">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-edificio"/></svg></span><span><span class="t">Empresas</span><span class="d">Tus clientes son otros negocios</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Ambos">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-apreton"/></svg></span><span><span class="t">Los dos</span><span class="d">Le vendes a personas y a empresas</span></span>
+    </button>
+  </div>
+  <div class="err" data-err="cliente">Elige una opción.</div>
+
+  <div class="field" style="margin-top:20px">
+    <label class="lb" for="f_cliente_det">Descríbelo un poco más <span class="optional">Opcional</span>
+      <span class="lbhint">Edad, situación, qué necesita. Mientras más claro, mejor te vende la página.</span>
+    </label>
+    <textarea id="f_cliente_det" placeholder="Ej: Mamás de 28 a 45 años que organizan el cumpleaños de sus hijos y quieren algo bonito sin complicarse."></textarea>
+  </div>
+</section>
+
+<!-- 5 · ACCIÓN -->
+<section class="step" data-step="5">
+  <div class="eyebrow">El objetivo</div>
+  <h2>Cuando alguien entre a tu página, ¿qué quieres que haga?</h2>
+  <p class="sub">Elige 1 o 2. Todo el diseño va a empujar hacia ahí.</p>
+  <div class="cards" data-multi="accion" data-max="2">
+    <button type="button" class="card" aria-pressed="false" data-v="Escribirte por WhatsApp">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg></span><span><span class="t">Escribirte por WhatsApp</span><span class="d">Lo más común y lo que más convierte</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Llamarte por teléfono">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-telefono"/></svg></span><span><span class="t">Llamarte</span><span class="d">Un botón de llamada directa</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Agendar una cita">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-calendario"/></svg></span><span><span class="t">Agendar una cita</span><span class="d">Consultas, sesiones, citas con hora</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Ver el catálogo y pedir">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-carrito"/></svg></span><span><span class="t">Ver el catálogo y pedir</span><span class="d">Mostrar productos con foto y precio</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Dejar sus datos en un formulario">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-formulario"/></svg></span><span><span class="t">Dejar sus datos</span><span class="d">Un formulario para que tú lo contactes</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Visitar el local físico">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg></span><span><span class="t">Ir a tu local</span><span class="d">Mapa, dirección y horario</span></span>
+    </button>
+  </div>
+  <div class="err" data-err="accion">Elige al menos una.</div>
+</section>
+
+<!-- 6 · DIFERENCIAL -->
+<section class="step" data-step="6">
+  <div class="eyebrow">Tu ventaja</div>
+  <h2>¿Por qué te compran a ti y no al de al lado?</h2>
+  <p class="sub">Esta es la pregunta más importante del formulario. Responde sin modestia.</p>
+
+  <div class="field">
+    <label class="lb" for="f_dif">Lo que te hace diferente
+      <span class="lbhint">Ej: entrega el mismo día, 12 años de experiencia, único que trabaja sin gluten, garantía de por vida, atiendes personalmente…</span>
+    </label>
+    <textarea id="f_dif" data-req placeholder="Ej: Somos los únicos en la zona que hacemos repostería sin azúcar y sin gluten. 8 años haciéndolo y entregamos a domicilio en menos de 24 horas."></textarea>
+    <div class="err" data-err="f_dif">Cuéntanos qué te hace diferente.</div>
+  </div>
+
+  <div class="field">
+    <label class="lb">¿Tienes reseñas o testimonios de clientes?</label>
+    <div class="chips" data-single="testis">
+      <button type="button" class="chip" aria-pressed="false" data-v="Sí, los envío por WhatsApp">Sí, los envío</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Tengo en Instagram / Google">Tengo en IG o Google</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Todavía no">Todavía no</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_numeros">¿Algún número del que estés orgulloso? <span class="optional">Opcional</span>
+      <span class="lbhint">Años de experiencia, clientes atendidos, pedidos entregados. Los números generan confianza.</span>
+    </label>
+    <input type="text" id="f_numeros" placeholder="Ej: 8 años · +500 tortas entregadas">
+  </div>
+</section>
+
+<!-- 7 · CONTACTO -->
+<section class="step" data-step="7">
+  <div class="eyebrow">Tus datos</div>
+  <h2>¿Cómo te contactan?</h2>
+  <p class="sub">Esto va en los botones de la página. Revisa que esté bien escrito.</p>
+
+  <div class="field">
+    <label class="lb" for="f_wa">WhatsApp del negocio</label>
+    <div class="prefix"><span>+</span><input type="tel" id="f_wa" data-req placeholder="58 412 000 0000" inputmode="tel"></div>
+    <div class="err" data-err="f_wa">Escribe tu número de WhatsApp con el código del país.</div>
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_ig">Instagram <span class="optional">Opcional</span></label>
+    <div class="prefix"><span>@</span><input type="text" id="f_ig" placeholder="tunegocio"></div>
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_email">Correo <span class="optional">Opcional</span></label>
+    <input type="email" id="f_email" placeholder="hola@tunegocio.com" autocomplete="email">
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_dir">Dirección del local <span class="optional">Opcional</span>
+      <span class="lbhint">Solo si recibes clientes ahí. Le ponemos mapa.</span>
+    </label>
+    <input type="text" id="f_dir" placeholder="Av. Bolívar, C.C. Sambil, local 12">
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_horario">Horario de atención <span class="optional">Opcional</span></label>
+    <input type="text" id="f_horario" placeholder="Lun a Sáb, 9:00 am – 6:00 pm">
+  </div>
+</section>
+
+<!-- 8 · ESTILO -->
+<section class="step" data-step="8">
+  <div class="eyebrow">El look</div>
+  <h2>¿Qué debe sentir alguien al ver tu página?</h2>
+  <p class="sub">No pienses en diseño. Piensa en la sensación.</p>
+  <div class="chips" data-single="estilo">
+    <button type="button" class="chip" aria-pressed="false" data-v="Elegante y minimalista — limpio, mucho espacio, serio"><svg class="i" aria-hidden="true"><use href="#i-chispa"/></svg> Elegante y limpio</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Cálido y cercano — humano, de confianza, familiar"><svg class="i" aria-hidden="true"><use href="#i-corazon"/></svg> Cálido y cercano</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Moderno y tecnológico — actual, dinámico"><svg class="i" aria-hidden="true"><use href="#i-rayo"/></svg> Moderno y tech</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Atrevido y colorido — llamativo, con energía"><svg class="i" aria-hidden="true"><use href="#i-paleta"/></svg> Atrevido y colorido</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Clásico y formal — sobrio, institucional, confiable"><svg class="i" aria-hidden="true"><use href="#i-columna"/></svg> Clásico y formal</button>
+    <button type="button" class="chip" aria-pressed="false" data-v="Natural y artesanal — orgánico, hecho a mano"><svg class="i" aria-hidden="true"><use href="#i-hoja"/></svg> Natural y artesanal</button>
+  </div>
+  <div class="err" data-err="estilo">Elige una opción.</div>
+
+  <div class="field" style="margin-top:24px">
+    <label class="lb">Colores</label>
+    <div class="pals" data-single="colores">
+      <button type="button" class="pal" aria-pressed="false" data-v="Usar los colores de mi logo">
+        <div class="sw"><i style="background:linear-gradient(135deg,#4F46E5,#EC4899,#F59E0B)"></i></div>
+        <div class="t">Los de mi logo</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Azules / profesional">
+        <div class="sw"><i style="background:#1E3A8A"></i><i style="background:#3B82F6"></i><i style="background:#DBEAFE"></i></div>
+        <div class="t">Azules · confianza</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Negro y dorado / premium">
+        <div class="sw"><i style="background:#111827"></i><i style="background:#C9A227"></i><i style="background:#F5F5F4"></i></div>
+        <div class="t">Negro y dorado · premium</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Tierra y beige / cálido">
+        <div class="sw"><i style="background:#7C4A2D"></i><i style="background:#D9A47A"></i><i style="background:#F5EDE4"></i></div>
+        <div class="t">Tierra · cálido</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Verdes / natural y salud">
+        <div class="sw"><i style="background:#14532D"></i><i style="background:#4ADE80"></i><i style="background:#ECFDF5"></i></div>
+        <div class="t">Verdes · natural</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Rosados / femenino y suave">
+        <div class="sw"><i style="background:#9D174D"></i><i style="background:#F472B6"></i><i style="background:#FDF2F8"></i></div>
+        <div class="t">Rosados · suave</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Blanco y negro / minimalista">
+        <div class="sw"><i style="background:#0A0A0A"></i><i style="background:#737373"></i><i style="background:#FAFAFA"></i></div>
+        <div class="t">Blanco y negro</div>
+      </button>
+      <button type="button" class="pal" aria-pressed="false" data-v="Que ustedes decidan">
+        <div class="sw"><i style="background:var(--indigo-l);border:1.5px dashed var(--indigo-b)"></i></div>
+        <div class="t">Decidan ustedes</div>
+      </button>
+    </div>
+    <div class="err" data-err="colores">Elige una opción.</div>
+  </div>
+</section>
+
+<!-- 9 · MATERIAL -->
+<section class="step" data-step="9">
+  <div class="eyebrow">Casi listo</div>
+  <h2>¿Qué material tienes a mano?</h2>
+  <p class="sub">No te preocupes si no tienes nada — lo resolvemos igual.</p>
+  <div class="cards" data-multi="material" data-max="9">
+    <button type="button" class="card" aria-pressed="false" data-v="Logo">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-diana"/></svg></span><span><span class="t">Logo</span><span class="d">En cualquier formato</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Fotos propias del negocio o productos">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-foto"/></svg></span><span><span class="t">Fotos propias</span><span class="d">Del local, del equipo o de tus productos</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="Textos ya escritos">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-documento"/></svg></span><span><span class="t">Textos ya escritos</span><span class="d">Si ya tienes algo redactado</span></span>
+    </button>
+    <button type="button" class="card" aria-pressed="false" data-v="No tengo nada — necesito que ustedes lo resuelvan">
+      <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-manos"/></svg></span><span><span class="t">No tengo nada todavía</span><span class="d">Ustedes se encargan de todo</span></span>
+    </button>
+  </div>
+  <p class="hint">Si marcaste logo o fotos, mándanoslos por WhatsApp después de enviar este formulario.</p>
+
+  <div class="field" style="margin-top:22px">
+    <label class="lb" for="f_ref">¿Alguna página web que te guste? <span class="optional">Opcional</span>
+      <span class="lbhint">De cualquier rubro, aunque no tenga nada que ver con el tuyo. Nos ahorra vueltas.</span>
+    </label>
+    <input type="text" id="f_ref" placeholder="Ej: apple.com — me gusta lo limpia que es">
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_sub">¿Cómo quieres tu dirección web? <span class="optional">Opcional</span></label>
+    <div class="prefix">
+      <input type="text" id="f_sub" placeholder="tunegocio" style="text-align:right" autocapitalize="off" autocorrect="off">
+      <span class="suffix">.tuwebgo.net</span>
+    </div>
+    <p class="hint">Si ya tienes un dominio propio, escríbelo aquí y lo conectamos.</p>
+  </div>
+
+  <div class="field">
+    <label class="lb" for="f_extra">¿Algo más que debamos saber? <span class="optional">Opcional</span>
+      <span class="lbhint">Cualquier cosa: algo que odies de otras páginas, una promoción que quieras destacar, lo que sea.</span>
+    </label>
+    <textarea id="f_extra" placeholder="Escribe aquí…"></textarea>
+  </div>
+</section>
+
+<!-- 10 · FINAL -->
+<section class="step" data-step="10">
+  <div class="done">
+    <div class="tick"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg></div>
+    <h2>Revisa que esté todo bien</h2>
+    <p class="sub">Lee el resumen y, si está correcto, toca Enviar. Esto es lo único que necesitamos de ti para arrancar.</p>
+  </div>
+  <div class="summary" id="summary"></div>
+  <div class="stack">
+    <button type="button" class="btn btn-p" id="send">Enviar mi brief</button>
+  </div>
+  <div class="next">
+    <b>Qué sigue</b>
+    <ol>
+      <li>Recibimos tu brief y empezamos a trabajar.</li>
+      <li>Si marcaste logo o fotos, te los pedimos por WhatsApp.</li>
+      <li>En <b>48 horas</b> te mandamos el pre-diseño para que lo veas.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- 11 · ENVIADO -->
+<section class="step" data-step="11">
+  <div class="done">
+    <div class="tick"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg></div>
+    <h2>Recibido</h2>
+    <p class="sub">Ya tenemos todo lo que necesitamos. Te escribimos por WhatsApp apenas tengamos tu pre-diseño listo.</p>
+  </div>
+  <div class="next">
+    <b>Qué sigue</b>
+    <ol>
+      <li>Empezamos a trabajar en tu pre-diseño de una vez.</li>
+      <li>Si necesitamos tu logo o fotos, te los pedimos por WhatsApp.</li>
+      <li>En <b>48 horas</b> te mandamos el enlace para que lo veas.</li>
+    </ol>
+  </div>
+  <p style="text-align:center;font-size:13px;color:#6b7280;margin-top:18px">
+    Ya puedes cerrar esta página.
+  </p>
+</section>
+
+</main>
+
+<footer>TuWebGo · tuwebgo.net</footer>
+</div>
+
+<div class="nav" id="nav">
+  <div class="navin">
+    <button type="button" class="btn btn-g" id="back" style="display:none">←</button>
+    <button type="button" class="btn btn-p" id="next">Empezar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+var LAST = 10;                      // índice del paso de resumen
+var ENVIADO = 11;                   // pantalla de confirmación
+var LABELS = ["","Tu negocio","Rubro","Qué ofreces","Tu cliente","Objetivo","Tu ventaja","Contacto","Estilo","Material","Listo"];
+
+/* El token identifica de quién es este brief. Viaja en el enlace que le
+   mandamos por WhatsApp; sin él no hay a qué lead atarlo. */
+var TOKEN = new URLSearchParams(location.search).get("t") || "";
+
+/* Clave de respaldo local. Va por token: si alguien abre dos enlaces
+   distintos en el mismo teléfono, no se pisan. */
+var CLAVE = "briefv1:" + TOKEN;
+
+var i = 0;
+var picks = {};                     // selecciones de chips/cards
+var steps = document.querySelectorAll(".step");
+var $ = function(id){ return document.getElementById(id); };
+var val = function(id){ var e=$(id); return e ? e.value.trim() : ""; };
+
+/* ---------- servicios dinámicos ---------- */
+var svcN = 0;
+function addSvc(ph){
+  if(svcN >= 6) return;
+  svcN++;
+  var row = document.createElement("div");
+  row.className = "svc";
+  row.innerHTML = '<div class="n">'+svcN+'</div>';
+  var inp = document.createElement("input");
+  inp.type = "text"; inp.className = "svc-i";
+  inp.placeholder = ph || ("Producto o servicio "+svcN);
+  row.appendChild(inp);
+  $("svcs").appendChild(row);
+  if(svcN >= 6) $("addsvc").style.display = "none";
+}
+addSvc("Ej: Tortas por encargo");
+addSvc("Ej: Mesa de postres para eventos");
+addSvc("Ej: Cursos de repostería");
+$("addsvc").addEventListener("click", function(){ addSvc(); });
+
+function svcList(){
+  var out = [];
+  document.querySelectorAll(".svc-i").forEach(function(e){
+    var v = e.value.trim(); if(v) out.push(v);
+  });
+  return out;
+}
+
+/* ---------- selección chips / cards / paletas ---------- */
+function wire(root){
+  root.querySelectorAll("[data-single]").forEach(function(g){
+    var key = g.getAttribute("data-single");
+    g.querySelectorAll("button").forEach(function(b){
+      b.addEventListener("click", function(){
+        g.querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+        b.setAttribute("aria-pressed","true");
+        picks[key] = b.getAttribute("data-v");
+        clearErr(key);
+        onPick(key, picks[key]);
+      });
+    });
+  });
+  root.querySelectorAll("[data-multi]").forEach(function(g){
+    var key = g.getAttribute("data-multi");
+    var max = parseInt(g.getAttribute("data-max"),10) || 99;
+    picks[key] = [];
+    g.querySelectorAll("button").forEach(function(b){
+      b.addEventListener("click", function(){
+        var v = b.getAttribute("data-v");
+        var on = b.getAttribute("aria-pressed") === "true";
+        if(on){
+          b.setAttribute("aria-pressed","false");
+          picks[key] = picks[key].filter(function(x){ return x !== v; });
+        } else {
+          if(picks[key].length >= max){
+            // suelta el más antiguo
+            var drop = picks[key].shift();
+            g.querySelectorAll("button").forEach(function(x){
+              if(x.getAttribute("data-v") === drop) x.setAttribute("aria-pressed","false");
+            });
+          }
+          b.setAttribute("aria-pressed","true");
+          picks[key].push(v);
+        }
+        clearErr(key);
+      });
+    });
+  });
+}
+wire(document);
+
+function onPick(key, v){
+  if(key === "rubro"){
+    $("rubro_otro_box").style.display = (v === "Otro") ? "block" : "none";
+  }
+  if(key === "precios"){
+    $("precios_box").style.display = (v === "No mostrar precios") ? "none" : "block";
+  }
+}
+
+/* ---------- errores ---------- */
+function showErr(k, msg){
+  var e = document.querySelector('[data-err="'+k+'"]');
+  if(e){ if(msg) e.textContent = msg; e.classList.add("on"); }
+  var f = $(k); if(f){ f.classList.add("bad"); }
+}
+function clearErr(k){
+  var e = document.querySelector('[data-err="'+k+'"]');
+  if(e) e.classList.remove("on");
+  var f = $(k); if(f) f.classList.remove("bad");
+}
+document.querySelectorAll("input,textarea").forEach(function(el){
+  el.addEventListener("input", function(){ clearErr(el.id); });
+});
+
+/* ---------- validación por paso ---------- */
+function validate(n){
+  var bad = null;
+  function req(id){
+    if(!val(id)){ showErr(id); if(!bad) bad = $(id); }
+  }
+  function need(k){
+    if(!picks[k] || (Array.isArray(picks[k]) && !picks[k].length)){
+      showErr(k);
+      if(!bad) bad = document.querySelector('[data-err="'+k+'"]');
+    }
+  }
+  if(n === 1){ req("f_nombre"); req("f_que"); req("f_zona"); }
+  if(n === 2){ need("rubro"); }
+  if(n === 3){
+    if(!svcList().length){ showErr("svcs"); if(!bad) bad = $("svcs"); }
+    need("precios");
+  }
+  if(n === 4){ need("cliente"); }
+  if(n === 5){ need("accion"); }
+  if(n === 6){ req("f_dif"); }
+  if(n === 7){
+    var w = val("f_wa").replace(/\D/g,"");
+    if(w.length < 10){ showErr("f_wa"); if(!bad) bad = $("f_wa"); }
+  }
+  if(n === 8){ need("estilo"); need("colores"); }
+
+  if(bad){
+    bad.scrollIntoView({behavior:"smooth", block:"center"});
+    if(bad.focus) try{ bad.focus({preventScroll:true}); }catch(e){}
+    return false;
+  }
+  return true;
+}
+
+/* ---------- navegación ---------- */
+function render(){
+  steps.forEach(function(s){ s.classList.toggle("on", +s.getAttribute("data-step") === i); });
+  var pct = Math.min(100, (i / LAST) * 100);
+  $("pfill").style.width = pct + "%";
+  $("pnum").textContent = i === 0 ? "" : (i >= LAST ? "Completado" : "Paso " + i + " de " + (LAST-1));
+  $("plabel").textContent = (i === 0 || i >= LAST) ? "" : LABELS[i];
+  $("back").style.display = (i === 0 || i >= LAST) ? "none" : "inline-flex";
+  // La barra de abajo desaparece en el resumen y en la confirmación: ahí el
+  // único botón que importa es Enviar, y compartir pantalla con "Continuar"
+  // hace que se toque el que no es.
+  $("nav").style.display = (i >= LAST) ? "none" : "block";
+  $("next").textContent = i === 0 ? "Empezar" : (i === LAST-1 ? "Ver mi resumen" : "Continuar");
+  $("badge").textContent = i === 0 ? "≈ 4 minutos"
+    : (i >= LAST ? "Completado" : Math.max(1, Math.ceil((LAST-1-i) * 0.5)) + " min restantes");
+  window.scrollTo({top:0, behavior: i===0 ? "auto" : "smooth"});
+  var first = steps[i] && steps[i].querySelector("input,textarea");
+  if(first && i > 0 && window.innerWidth > 700) try{ first.focus({preventScroll:true}); }catch(e){}
+}
+
+$("next").addEventListener("click", function(){
+  if(i > 0 && !validate(i)) return;
+  if(i === LAST-1){ build(); }
+  i = Math.min(i+1, LAST);
+  render();
+});
+$("back").addEventListener("click", function(){ i = Math.max(i-1, 0); render(); });
+
+document.addEventListener("keydown", function(e){
+  if(e.key === "Enter" && i < LAST && e.target.tagName !== "TEXTAREA"){
+    e.preventDefault(); $("next").click();
+  }
+});
+
+/* ---------- construcción del brief ---------- */
+var brief = "";
+function line(label, v){ return v ? ("*"+label+":* "+v+"\n") : ""; }
+
+function build(){
+  var rubro = picks.rubro === "Otro" ? (val("f_rubro_otro") || "Otro") : (picks.rubro||"");
+  var svcs  = svcList();
+  var acc   = (picks.accion||[]).join(" · ");
+  var mat   = (picks.material||[]).join(" · ");
+  var sub   = val("f_sub");
+
+  var t = "";
+  t += "*BRIEF TUWEBGO*\n";
+  t += "———————————————\n\n";
+  t += "*NEGOCIO*\n";
+  t += line("Nombre", val("f_nombre"));
+  t += line("Qué hace", val("f_que"));
+  t += line("Rubro", rubro);
+  t += line("Zona", val("f_zona"));
+  t += "\n*QUÉ OFRECE*\n";
+  svcs.forEach(function(s,n){ t += (n+1)+". "+s+"\n"; });
+  t += line("Precios", picks.precios);
+  if(val("f_precios")) t += "*Detalle de precios:*\n"+val("f_precios")+"\n";
+  t += "\n*CLIENTE Y OBJETIVO*\n";
+  t += line("Cliente", picks.cliente);
+  t += line("Perfil", val("f_cliente_det"));
+  t += line("Acción principal", acc);
+  t += "\n*VENTAJA*\n";
+  t += line("Diferencial", val("f_dif"));
+  t += line("Testimonios", picks.testis);
+  t += line("Cifras", val("f_numeros"));
+  t += "\n*CONTACTO*\n";
+  t += line("WhatsApp", val("f_wa") ? "+"+val("f_wa") : "");
+  t += line("Instagram", val("f_ig") ? "@"+val("f_ig").replace(/^@/,"") : "");
+  t += line("Email", val("f_email"));
+  t += line("Dirección", val("f_dir"));
+  t += line("Horario", val("f_horario"));
+  t += "\n*ESTILO*\n";
+  t += line("Sensación", picks.estilo);
+  t += line("Colores", picks.colores);
+  t += "\n*MATERIAL Y EXTRAS*\n";
+  t += line("Tiene", mat);
+  t += line("Referencia", val("f_ref"));
+  t += line("Dirección web", sub ? (sub.indexOf(".")>-1 ? sub : sub+".tuwebgo.net") : "");
+  t += line("Notas", val("f_extra"));
+
+  brief = t;
+  $("summary").textContent = t.replace(/\*/g,"");
+}
+
+/* ---------- envío ---------- */
+function toast(m){
+  var el = $("toast");
+  el.textContent = m; el.classList.add("on");
+  setTimeout(function(){ el.classList.remove("on"); }, 2200);
+}
+
+/* ---------- respuestas estructuradas ----------
+   El resumen en texto es para que el cliente lea antes de enviar. Lo que se
+   guarda es esto: campo por campo, para poder consultarlo después sin tener
+   que leer un párrafo entero. */
+function datos(){
+  return {
+    nombre:      val("f_nombre"),
+    que_hace:    val("f_que"),
+    rubro:       picks.rubro === "Otro" ? (val("f_rubro_otro") || "Otro") : (picks.rubro || ""),
+    zona:        val("f_zona"),
+    servicios:   svcList(),
+    precios:     picks.precios || "",
+    precios_detalle: val("f_precios"),
+    cliente:     picks.cliente || "",
+    cliente_detalle: val("f_cliente_det"),
+    accion:      picks.accion || [],
+    diferencial: val("f_dif"),
+    testimonios: picks.testis || "",
+    cifras:      val("f_numeros"),
+    whatsapp:    val("f_wa"),
+    instagram:   val("f_ig"),
+    email:       val("f_email"),
+    direccion:   val("f_dir"),
+    horario:     val("f_horario"),
+    estilo:      picks.estilo || "",
+    colores:     picks.colores || "",
+    material:    picks.material || [],
+    referencia:  val("f_ref"),
+    subdominio:  val("f_sub"),
+    notas:       val("f_extra"),
+    resumen:     brief.replace(/\*/g, "")
+  };
+}
+
+/* ---------- respaldo local ----------
+   Diez pasos son mucho trabajo para perderlos porque sonó el teléfono y se
+   cerró la pestaña. Se guarda en cada cambio y se restaura al volver. */
+function guardar(){
+  try{
+    localStorage.setItem(CLAVE, JSON.stringify({
+      i: i, picks: picks,
+      campos: [].slice.call(document.querySelectorAll("input,textarea"))
+        .map(function(e){ return [e.id || "", e.value]; }),
+      svcs: svcList()
+    }));
+  }catch(e){ /* modo privado o disco lleno: no es motivo para romper nada */ }
+}
+
+function restaurar(){
+  var crudo;
+  try{ crudo = localStorage.getItem(CLAVE); }catch(e){ return; }
+  if(!crudo) return;
+  var d;
+  try{ d = JSON.parse(crudo); }catch(e){ return; }
+
+  (d.campos || []).forEach(function(par){
+    if(!par[0] || !par[1]) return;
+    var e = $(par[0]); if(e) e.value = par[1];
+  });
+
+  // Los servicios son filas dinámicas: hay que recrearlas antes de llenarlas.
+  var svcs = d.svcs || [];
+  while(svcN < svcs.length) addSvc();
+  var inputs = document.querySelectorAll(".svc-i");
+  svcs.forEach(function(v, n){ if(inputs[n]) inputs[n].value = v; });
+
+  Object.keys(d.picks || {}).forEach(function(k){
+    var v = d.picks[k];
+    picks[k] = v;
+    var lista = Array.isArray(v) ? v : [v];
+    lista.forEach(function(uno){
+      var b = document.querySelector('[data-single="'+k+'"] [data-v="'+CSS.escape(uno)+'"]')
+           || document.querySelector('[data-multi="'+k+'"] [data-v="'+CSS.escape(uno)+'"]');
+      if(b) b.setAttribute("aria-pressed","true");
+    });
+    onPick(k, Array.isArray(v) ? v[0] : v);
+  });
+
+  if(typeof d.i === "number" && d.i > 0 && d.i < LAST) i = d.i;
+}
+
+document.addEventListener("input", guardar);
+document.addEventListener("click", function(e){
+  if(e.target.closest("[data-single] button, [data-multi] button")) guardar();
+});
+
+/* ---------- envío ---------- */
+var enviando = false;
+
+$("send").addEventListener("click", function(){
+  if(enviando) return;
+  if(!TOKEN){
+    toast("Este enlace no es válido. Pídenos uno nuevo por WhatsApp.");
+    return;
+  }
+  enviando = true;
+  var b = $("send");
+  b.disabled = true;
+  b.textContent = "Enviando…";
+
+  fetch("/api/brief?t=" + encodeURIComponent(TOKEN), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ datos: datos() })
+  })
+  .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+  .then(function(res){
+    if(!res.ok) throw new Error(res.j && res.j.error ? res.j.error : "No se pudo enviar");
+    // Enviado: el respaldo local ya no hace falta y dejarlo solo confunde si
+    // vuelve a abrir el enlace.
+    try{ localStorage.removeItem(CLAVE); }catch(e){}
+    i = ENVIADO;
+    render();
+  })
+  .catch(function(err){
+    enviando = false;
+    b.disabled = false;
+    b.textContent = "Enviar mi brief";
+    toast(err.message || "No se pudo enviar. Revisa tu conexión.");
+  });
+});
+
+/* ---------- arranque ----------
+   Se le pregunta al portal de quién es el enlace. Sirve para dos cosas:
+   saludarlo por su nombre y avisarle si ya lo había enviado. */
+restaurar();
+render();
+
+if(TOKEN){
+  fetch("/api/brief?t=" + encodeURIComponent(TOKEN))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.error) return;
+      if(d.negocio && !val("f_nombre")) $("f_nombre").value = d.negocio;
+      var h = $("hola");
+      if(h && d.nombre){ h.textContent = "Hola " + d.nombre; h.style.display = "block"; }
+      if(d.yaEnviado){
+        var a = $("aviso_enviado");
+        if(a) a.style.display = "block";
+      }
+    })
+    .catch(function(){ /* sin conexión: el formulario se puede llenar igual */ });
+}
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type TurnoConversacion } from '@/lib/gemini'
 import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, HANDOFF_PAUSA_BOT } from '@/lib/config'
+import { urlFormulario } from '@/lib/pagos'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 
@@ -85,6 +86,14 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       plan_interested?: string | null; amount_quoted?: number | null; ref_code?: string | null
     }
 
+    // Enlace del brief con el token de esta conversación. La RPC es
+    // idempotente: el enlace que se mandó ayer sigue sirviendo hoy. Si falla,
+    // se sigue sin él — Sofía dice que se lo mandan y no inventa una URL.
+    let enlaceFormulario: string | undefined
+    const { data: briefToken, error: tokErr } = await db.rpc('brief_token_conversacion', { p_conv_id: convId })
+    if (tokErr) console.error('[autoReply] token del brief:', tokErr.message)
+    else if (briefToken) enlaceFormulario = urlFormulario(briefToken as string)
+
     // ── Redacción ──
     const { texto, handoff, tokensIn, tokensOut, modelo } = await redactarBorrador({
       apiKey,
@@ -94,6 +103,7 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
         plan: lead.plan_interested, montoCotizado: lead.amount_quoted, refCode: lead.ref_code,
       },
       conversacion: historial,
+      enlaceFormulario,
     })
 
     // Se registra ANTES de enviar: el token se gastó aunque el envío falle.

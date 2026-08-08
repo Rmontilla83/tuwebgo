@@ -162,8 +162,16 @@ PROCESO — 4 pasos
 3. En 48h recibe el pre-diseño por $50 · 4. Aprueba y se entrega.
 
 QUÉ NECESITAMOS DEL CLIENTE PARA ARRANCAR
-Logo si tiene · fotos de productos o del local · textos (qué hace, dónde está,
-horarios) · redes sociales y WhatsApp de contacto.
+Dos cosas, y van por caminos distintos:
+
+1. LA INFORMACIÓN DEL NEGOCIO — qué hace, qué vende, precios, zona, horarios,
+   a quién le vende, sus redes, qué estilo y colores quiere. TODO eso va por el
+   FORMULARIO, nunca por el chat. Ver la sección de cobro.
+2. LOS ARCHIVOS — el logo y las fotos del local o los productos. Esos SÍ van
+   por WhatsApp, porque el formulario no recibe archivos.
+
+Nunca le pidas por chat los datos del punto 1, ni siquiera si te los está
+ofreciendo. Para eso está el formulario.
 
 LO QUE NO HACEMOS
 Apps móviles nativas · manejo de redes sociales · campañas publicitarias ·
@@ -249,6 +257,10 @@ REGLAS QUE NO SE ROMPEN
 - Nunca des un pago por recibido. Puedes ENTREGAR los datos de cobro, nunca
   CONFIRMAR que el dinero llegó: no tienes acceso a la cuenta. Eso lo verifica
   una persona.
+- Los datos del negocio van SIEMPRE por el formulario, nunca por el chat. Si el
+  cliente te los empieza a escribir por WhatsApp —el nombre, lo que vende, sus
+  precios, su horario, su dirección, sus colores— no los recibas: agradécele y
+  pásale el enlace. Está en la sección de cobro. Ver el detalle ahí.
 - Si el mensaje no se entiende, pide que aclare en vez de asumir.
 `.trim()
 
@@ -341,11 +353,19 @@ type RespuestaGemini = {
 
 const ESQUEMA_RESPUESTA = {
   type: 'object',
-  required: ['mensaje', 'handoff'],
+  required: ['mensaje', 'handoff', 'enviar_formulario'],
   properties: {
     mensaje: {
       type: 'string',
       description: 'El texto listo para mandar por WhatsApp. Sin comillas ni prefijos.',
+    },
+    enviar_formulario: {
+      type: 'boolean',
+      description:
+        'true si este mensaje tiene que llevar el enlace del formulario: el cliente ' +
+        'reportó un pago, o escribió por el chat datos del negocio (nombre, precios, ' +
+        'horario, dirección, colores, redes). false en cualquier otro caso. ' +
+        'No hace falta que escribas el enlace en el mensaje: se agrega solo.',
     },
     handoff: {
       type: 'string',
@@ -419,6 +439,8 @@ export async function redactarBorrador(opts: {
   lead: ContextoLead
   conversacion: TurnoConversacion[]
   instruccionExtra?: string
+  /** Enlace del brief con el token de ESTA conversación. Sin él Sofía no lo ofrece. */
+  enlaceFormulario?: string
 }): Promise<{ texto: string; handoff: MotivoHandoff; tokensIn: number; tokensOut: number; modelo: string }> {
   const modelo = opts.modelo || MODELO_POR_DEFECTO
 
@@ -428,7 +450,7 @@ export async function redactarBorrador(opts: {
     PERSONA,
     '\n=== LA EMPRESA ===\n' + EMPRESA,
     '\n=== CATÁLOGO ===\n' + CATALOGO,
-    '\n=== COBRO ===\n' + (await bloquePagos()),
+    '\n=== COBRO ===\n' + (await bloquePagos(opts.enlaceFormulario)),
     '\n' + INSTRUCCION_HANDOFF,
   ].join('\n')
 
@@ -471,16 +493,40 @@ export async function redactarBorrador(opts: {
 
   let mensaje = crudo
   let handoff: MotivoHandoff = null
+  let quiereFormulario = false
   try {
-    const j = JSON.parse(crudo) as { mensaje?: string; handoff?: string }
+    const j = JSON.parse(crudo) as { mensaje?: string; handoff?: string; enviar_formulario?: boolean }
     if (j.mensaje) mensaje = j.mensaje
     if (j.handoff && j.handoff !== 'ninguno') handoff = j.handoff as MotivoHandoff
+    quiereFormulario = j.enviar_formulario === true
   } catch {
     // Si por lo que sea no vino JSON, usamos el texto tal cual y no hay handoff.
   }
 
+  let texto = mensaje.replace(/^["“”']|["“”']$/g, '').trim()
+
+  /**
+   * El enlace lo pega el código, no el modelo.
+   *
+   * En las pruebas lo mandaba a veces sí y a veces no con el mismo prompt: a
+   * temperatura 0.75 no hay forma de garantizar que reproduzca una cadena
+   * exacta. Un enlace que falta deja al cliente esperando, y uno con un
+   * carácter cambiado lo manda a un 404. Ninguna de las dos cosas puede quedar
+   * a criterio de un modelo de lenguaje.
+   *
+   * Si el modelo ya lo escribió bien, no se toca nada.
+   */
+  if ((quiereFormulario || handoff === 'pago_reportado') && opts.enlaceFormulario) {
+    if (!texto.includes(opts.enlaceFormulario)) {
+      // Se le quita cualquier intento propio de escribir la URL, que sería la
+      // versión mal copiada, antes de poner la buena.
+      texto = texto.replace(/https?:\/\/\S*brief\.html\S*/gi, '').replace(/[ \t]+\n/g, '\n').trim()
+      texto += `\n\n${opts.enlaceFormulario}`
+    }
+  }
+
   return {
-    texto: mensaje.replace(/^["“”']|["“”']$/g, '').trim(),
+    texto,
     handoff,
     // Se devuelven ambos: Gemini cobra entrada y salida a precios distintos
     // (la salida cuesta ~8x más), así que sumarlos daría un número inútil.

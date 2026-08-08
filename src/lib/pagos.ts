@@ -45,13 +45,19 @@ export const BINANCE = {
 export const STRIPE_LINK = ''
 
 /**
- * Formulario que se le manda al cliente después de que reporta el pago.
+ * Formulario del brief.
  *
- * Vacío = todavía no existe. Sofía lo detecta y en vez de inventar un link
- * dice que se lo mandan enseguida. Nunca improvises una URL acá: un enlace
- * roto en el mensaje de "ya pagaste" es la peor primera impresión posible.
+ * El enlace lleva un token por conversación, así que NO es una constante: lo
+ * arma quien conoce la conversación (lib/autoReply.ts) y se lo pasa al prompt.
+ * Sin token el formulario no sabe a qué lead pertenece lo que le llenaron.
+ *
+ * Si no hay enlace, Sofía dice que se lo mandan enseguida. Nunca improvisa una
+ * URL: un enlace roto justo después de "ya pagué" es la peor primera impresión
+ * posible.
  */
-export const URL_FORMULARIO = ''
+export function urlFormulario(token: string): string {
+  return `https://portal.tuwebgo.net/brief.html?t=${token}`
+}
 
 /**
  * Precios en dólares que se convierten a bolívares.
@@ -75,7 +81,7 @@ const ETIQUETA_PRECIO: Record<number, string> = {
  * Se llama en cada respuesta y no una vez al arrancar: la tasa cambia todos los
  * días hábiles y un prompt construido al desplegar quedaría congelado.
  */
-export async function bloquePagos(): Promise<string> {
+export async function bloquePagos(enlaceFormulario?: string): Promise<string> {
   const tasa = await obtenerTasaBcv()
 
   const conversion = tasa
@@ -102,11 +108,18 @@ export async function bloquePagos(): Promise<string> {
     ? `\nTarjeta de crédito o débito (Stripe)\n  Link de pago: ${STRIPE_LINK}\n`
     : ''
 
-  const formulario = URL_FORMULARIO
-    ? `Mándale este enlace: ${URL_FORMULARIO}`
+  const formulario = enlaceFormulario
+    ? [
+        `Mándale este enlace EXACTO, sin cambiarle ni una letra:`,
+        enlaceFormulario,
+        '',
+        'Y dile con claridad que ahí va TODA la información del negocio, que no',
+        'nos la mande por WhatsApp. No es un capricho: lo que llega por chat se',
+        'pierde entre los mensajes y termina retrasando su propio pre-diseño.',
+      ].join('\n')
     : [
-        'TODAVÍA NO TIENES EL ENLACE DEL FORMULARIO CARGADO. No inventes ninguno.',
-        'Dile que ya le mandan el formulario para arrancar con el pre-diseño.',
+        'NO TIENES ENLACE DEL FORMULARIO PARA ESTA CONVERSACIÓN. No inventes',
+        'ninguno. Dile que ya le mandan el formulario para arrancar.',
       ].join('\n')
 
   return `
@@ -169,5 +182,41 @@ Pasa apenas mande una referencia, una captura o un "listo, ya te transferí".
 
 Confirmar un pago que no llegó obliga a una conversación muy incómoda después.
 Verificar toma minutos.
+
+EL FORMULARIO ES EL ÚNICO CANAL PARA LOS DATOS DEL NEGOCIO
+Esto vale para TODA la conversación, no solo después del pago, y es una de las
+cosas que más se te va a olvidar. Prestale atención.
+
+LA REGLA, EN UNA LÍNEA
+Si el cliente escribe por el chat cualquier dato que pide el formulario, marca
+enviar_formulario en true. Siempre, en cualquier momento de la conversación.
+
+Los datos del negocio son: cómo se llama, qué vende, sus precios, su zona, su
+horario, su dirección, a quién le vende, sus redes, qué estilo y colores quiere.
+
+No le recibas nada de eso por chat como si estuviera bien: se pierde entre los
+mensajes y termina retrasando su propio pre-diseño. Agradécele y remítelo al
+formulario.
+
+NO ESCRIBAS EL ENLACE EN EL MENSAJE. Con marcar enviar_formulario alcanza: el
+sistema lo agrega al final, siempre correcto. Escribe tu mensaje como si el
+enlace ya estuviera puesto abajo ("llena esto", "ponlo acá"). Si lo escribes tú
+y te comes un carácter, el cliente cae en una página que no existe.
+
+  El cliente escribe:
+    "mi peluquería se llama Yorman, queda en Lechería, abro de lunes a sábado
+     de 9 a 7, cobro 8$ el corte y mis colores son negro y dorado"
+
+  MAL: "Perfecto, mándanos el logo y unas fotos por aquí."
+       (le recibiste los datos por chat: se van a perder)
+
+  La idea de lo que sí va: reconocer que eso es justo lo que hace falta, pedirle
+  que lo ponga en el formulario para que no se pierda, y pasarle el enlace.
+  ESCRÍBELO CON TUS PALABRAS, distinto cada vez. Si repites la misma frase en
+  cada conversación suena a máquina, que es justo lo que estamos evitando.
+
+Dos excepciones, que SÍ van por WhatsApp:
+  · El logo, las fotos y cualquier archivo. El formulario no recibe archivos.
+  · Las dudas sobre el servicio. Para eso estás tú.
 `.trim()
 }

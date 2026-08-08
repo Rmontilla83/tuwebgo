@@ -17,8 +17,14 @@ const NAV_ITEMS = [
   { href: '/dashboard/analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
 ]
 
-// Sidebar de escritorio: ahí sí entra Config, hay espacio de sobra.
-const NAV_DESKTOP = [...NAV_ITEMS, { href: '/dashboard/settings', label: 'Config', icon: ICON_CONFIG }]
+// Sidebar de escritorio: ahí sí entran Briefs y Config, hay espacio de sobra.
+// Briefs queda fuera del bottom bar a propósito — un brief se lee sentado,
+// mientras se diseña, no desde el teléfono. También se llega desde el lead.
+const NAV_DESKTOP = [
+  ...NAV_ITEMS,
+  { href: '/dashboard/briefs', label: 'Briefs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+  { href: '/dashboard/settings', label: 'Config', icon: ICON_CONFIG },
+]
 
 /** Burbuja de alerta. Ámbar cuando algo espera a un humano, índigo si solo hay sin leer. */
 function Badge({ n, urgente, className = '' }: { n: number; urgente: boolean; className?: string }) {
