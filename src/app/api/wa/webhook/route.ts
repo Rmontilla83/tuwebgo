@@ -206,15 +206,32 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
     await db.from('wa_conversations').update(parche).eq('id', convId)
   }
 
-  // Cierra el bucle de atribución en las dos direcciones: crea el lead si no
-  // existe, engancha la conversación, y ata la sesión web al lead para no
-  // perder UTMs, dispositivo ni referrer. Todo en una transacción.
+  // Cierra el bucle de atribución: crea el lead si no existe, engancha la
+  // conversación, y ata la sesión web al lead para no perder UTMs.
+  //
+  // El ref code ya NO viaja en el mensaje (le ensuciaba el texto al cliente),
+  // así que hay dos caminos:
+  //  1. Si el mensaje trae uno, es de un enlace viejo todavía en circulación:
+  //     se usa, porque es atribución exacta.
+  //  2. Si no, se correlaciona por ventana de tiempo con el cta_click que quedó
+  //     registrado en `events`. Meta no manda nada sobre el origen en clics
+  //     orgánicos de wa.me — verificado sobre 150 webhooks, cero con `referral`.
+  const refDelMensaje = cuerpo ? extractRefCode(cuerpo) : null
+
   const { error: attrErr } = await db.rpc('wa_cerrar_atribucion', {
     p_conv_id: convId,
-    p_ref_code: cuerpo ? extractRefCode(cuerpo) : null,
+    p_ref_code: refDelMensaje,
     p_nombre: nombrePerfil,
   })
   if (attrErr) console.error('[wa-webhook] atribución:', attrErr.message)
+
+  if (!refDelMensaje) {
+    const { error: venErr } = await db.rpc('wa_atribuir_por_ventana', {
+      p_conv_id: convId,
+      p_minutos: 45,
+    })
+    if (venErr) console.error('[wa-webhook] atribución por ventana:', venErr.message)
+  }
 
   // El bot contesta solo. Se hace después de guardar y atribuir, para que el
   // mensaje del cliente aparezca en el inbox aunque el asistente falle.
