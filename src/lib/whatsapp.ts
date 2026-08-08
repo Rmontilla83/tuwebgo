@@ -50,8 +50,11 @@ export function normalizePhoneVE(raw: string | null | undefined): string | null 
     const local = d.slice(1)
     return local.length === 10 && local[0] === '4' ? `58${local}` : null
   }
-  // +58 / 58 con móvil detrás
-  if (d.startsWith('58') && d.length === 12 && d[2] === '4') return d
+  // +58 / 58: si es venezolano, el móvil DEBE empezar en 4. Un 58 seguido de
+  // otra cosa es un fijo (0212 Caracas, 0281 Anzoátegui...) y se rechaza acá.
+  // Si no, caía en la rama internacional de abajo y 150 fijos de la base
+  // quedaron marcados como WhatsApp válido — mensajes que nunca llegarían.
+  if (d.startsWith('58') && d.length === 12) return d[2] === '4' ? d : null
   // 10 dígitos sueltos que arrancan en 4
   if (d.length === 10 && d[0] === '4') return `58${d}`
 

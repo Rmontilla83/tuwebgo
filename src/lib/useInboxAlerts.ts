@@ -35,8 +35,12 @@ export function useInboxAlerts(): AlertasInbox {
 
       const [sinLeer, humano] = await Promise.all([
         supabase.from('wa_conversations').select('*', { count: 'exact', head: true }).gt('unread_count', 0),
+        // Solo cuenta si además hay algo SIN LEER. Un traspaso ya atendido no
+        // es pendiente: el trigger marca handoff_motivo también cuando Rafael
+        // responde a mano, así que sin este filtro el badge se quedaba en ámbar
+        // para siempre sobre conversaciones ya resueltas.
         supabase.from('wa_conversations').select('*', { count: 'exact', head: true })
-          .eq('bot_activo', false).not('handoff_motivo', 'is', null),
+          .eq('bot_activo', false).not('handoff_motivo', 'is', null).gt('unread_count', 0),
       ])
       if (!vivo) return
       // Ante un error dejamos el último valor bueno: mejor un número viejo que

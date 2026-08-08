@@ -218,6 +218,20 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
   //     orgánicos de wa.me — verificado sobre 150 webhooks, cero con `referral`.
   const refDelMensaje = cuerpo ? extractRefCode(cuerpo) : null
 
+  // ORDEN IMPORTANTE: primero la ventana, después el cierre genérico.
+  // Al revés, wa_cerrar_atribucion creaba el lead con source_channel
+  // 'organic_wa' y cuando la ventana identificaba la sesión de la landing ya
+  // era tarde: el lead existía y el canal quedaba mal. Toda visita de la web
+  // se contaba como WhatsApp directo.
+  if (!refDelMensaje) {
+    const { error: venErr } = await db.rpc('wa_atribuir_por_ventana', {
+      p_conv_id: convId,
+      p_minutos: 45,
+    })
+    // Best-effort: no encontrar la sesión de origen es un resultado legítimo.
+    if (venErr) console.error('[wa-webhook] atribución por ventana:', venErr.message)
+  }
+
   const { error: attrErr } = await db.rpc('wa_cerrar_atribucion', {
     p_conv_id: convId,
     p_ref_code: refDelMensaje,
@@ -230,16 +244,6 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
   // porque el error moría en un console.error que nadie mira. Ahora sube al
   // catch de POST, que lo escribe en wa_webhook_events.error.
   if (attrErr) throw new Error(`atribución: ${attrErr.message}`)
-
-  if (!refDelMensaje) {
-    const { error: venErr } = await db.rpc('wa_atribuir_por_ventana', {
-      p_conv_id: convId,
-      p_minutos: 45,
-    })
-    // Esta sí es best-effort: no encontrar la sesión de origen es un resultado
-    // legítimo, no un fallo. Solo se registra si la llamada misma revienta.
-    if (venErr) console.error('[wa-webhook] atribución por ventana:', venErr.message)
-  }
 
   // El bot contesta solo. Se hace después de guardar y atribuir, para que el
   // mensaje del cliente aparezca en el inbox aunque el asistente falle.
