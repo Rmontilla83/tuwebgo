@@ -66,7 +66,7 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
     // ── Historial ──
     const { data: msgs } = await db
       .from('wa_messages')
-      .select('direction, body, msg_type, created_at')
+      .select('direction, body, msg_type, transcrito, created_at')
       .eq('conversation_id', convId)
       .order('created_at', { ascending: false })
       .limit(20)
@@ -75,7 +75,18 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       .reverse()
       .map((m) => ({
         autor: m.direction === 'out' ? ('rafael' as const) : ('cliente' as const),
-        texto: m.body ?? `[${m.msg_type}]`,
+        // Una nota de voz va marcada como tal. Sin eso Sofía responde como si
+        // el cliente hubiera escrito, y le sale un "como me escribiste" que
+        // delata que del otro lado no escuchó nada.
+        //
+        // Y si la transcripción no salió —se cayó la descarga, falló Gemini—
+        // hay que DECÍRSELO. Con "[audio]" a secas se inventa una respuesta
+        // sobre algo que nadie oyó, que es la peor de las opciones.
+        texto: m.transcrito
+          ? `(nota de voz) ${m.body}`
+          : m.msg_type === 'audio'
+            ? '(el cliente mandó una nota de voz que NO se pudo escuchar — pídele que la repita o que te lo escriba)'
+            : m.body ?? `[${m.msg_type}]`,
       }))
 
     // Nada que responder si el último mensaje no es del cliente.

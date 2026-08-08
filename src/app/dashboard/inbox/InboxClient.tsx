@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatPhoneVE, templatesForStage, waLink } from '@/lib/whatsapp'
 import { PLANTILLAS, previsualizar, type PlantillaWA } from '@/lib/waTemplates'
-import { ICONO_HANDOFF, IconChat, IconCerrar, IconAsistente, IconUsuario, IconMano, IconFlecha, IconEnlaceExterno, IconLista } from '@/components/icons'
+import { ICONO_HANDOFF, IconChat, IconCerrar, IconAsistente, IconUsuario, IconMano, IconFlecha, IconEnlaceExterno, IconLista, IconTelefono } from '@/components/icons'
 
 export type Conversation = {
   id: string
@@ -35,6 +35,44 @@ type Message = {
   template_name: string | null
   por_bot: boolean
   created_at: string
+  media_path: string | null
+  /** true = el `body` no lo escribió el cliente, lo transcribimos nosotros. */
+  transcrito: boolean | null
+}
+
+/**
+ * Reproductor de una nota de voz.
+ *
+ * El bucket es privado, así que la URL se pide firmada y solo cuando alguien
+ * toca reproducir. Firmar las 20 al abrir la conversación serían 20 llamadas
+ * para audios que probablemente nadie escuche: la transcripción ya está ahí.
+ */
+function NotaDeVoz({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [cargando, setCargando] = useState(false)
+  const [err, setErr] = useState(false)
+
+  async function abrir() {
+    setCargando(true)
+    const { data, error } = await createClient()
+      .storage.from('wa-media').createSignedUrl(path, 3600)
+    setCargando(false)
+    if (error || !data) { setErr(true); return }
+    setUrl(data.signedUrl)
+  }
+
+  if (url) return <audio controls src={url} className="w-full max-w-[240px] h-9 mt-1.5" />
+  if (err) return <p className="text-[11px] text-red-600 mt-1">No se pudo cargar el audio</p>
+
+  return (
+    <button
+      type="button" onClick={abrir} disabled={cargando}
+      className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg border border-current/25 hover:bg-current/10 disabled:opacity-50"
+    >
+      <IconTelefono className="w-3 h-3" />
+      {cargando ? 'Cargando…' : 'Escuchar'}
+    </button>
+  )
 }
 
 const MOTIVO_LEGIBLE: Record<string, string> = {
@@ -619,7 +657,23 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                       {m.direction === 'out' && m.por_bot && (
                         <p className="text-[9px] font-semibold text-white/70 mb-0.5 inline-flex items-center gap-1"><IconAsistente className="w-3 h-3" />Sofía</p>
                       )}
-                      <p className="text-sm whitespace-pre-wrap break-words">{m.body || `[${m.msg_type}]`}</p>
+
+                      {/* Una transcripción se puede equivocar. Quien la lee
+                          tiene que saber que está leyendo una máquina y no
+                          las palabras exactas del cliente — sobre todo si de
+                          ahí sale un número de referencia bancaria. */}
+                      {m.transcrito && (
+                        <p className="text-[9px] font-semibold opacity-70 mb-0.5 inline-flex items-center gap-1">
+                          <IconTelefono className="w-3 h-3" />Nota de voz · transcrita
+                        </p>
+                      )}
+
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {m.body || (m.msg_type === 'audio' ? 'Nota de voz' : `[${m.msg_type}]`)}
+                      </p>
+
+                      {m.msg_type === 'audio' && m.media_path && <NotaDeVoz path={m.media_path} />}
+
                       <div className={`flex items-center gap-1.5 mt-1 ${m.direction === 'out' ? 'text-white/60' : 'text-[var(--text-muted)]'}`}>
                         <span className="text-[10px]">{horaCorta(m.created_at)}</span>
                         {m.channel === 'deeplink' && <IconEnlaceExterno className="w-2.5 h-2.5" />}

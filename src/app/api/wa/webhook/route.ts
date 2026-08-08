@@ -1,7 +1,9 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractRefCode } from '@/lib/whatsapp'
+import { after } from 'next/server'
 import { responderAutomatico } from '@/lib/autoReply'
+import { descargarMedia, transcribirAudio } from '@/lib/waMedia'
 
 export const runtime = 'nodejs'
 // Meta reintenta hasta 36h si no recibe 200 rápido. Nada de cachear.
@@ -59,10 +61,14 @@ type MetaMensaje = {
   timestamp?: string
   type: string
   text?: { body?: string }
-  image?: { id?: string; mime_type?: string }
-  audio?: { id?: string; mime_type?: string }
-  video?: { id?: string; mime_type?: string }
-  document?: { id?: string; mime_type?: string; filename?: string }
+  // El caption viene DENTRO del objeto del medio, no en `text`. Por leer solo
+  // `text.body` se perdía: si el cliente manda el comprobante con
+  // "referencia 004521887" escrito en el pie de la foto, ese número no
+  // quedaba registrado en ninguna parte.
+  image?: { id?: string; mime_type?: string; caption?: string }
+  audio?: { id?: string; mime_type?: string; voice?: boolean }
+  video?: { id?: string; mime_type?: string; caption?: string }
+  document?: { id?: string; mime_type?: string; filename?: string; caption?: string }
   referral?: { source_type?: string; ctwa_clid?: string }
 }
 
@@ -169,9 +175,13 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
     throw new Error(`No se pudo abrir conversación para ${m.from}: ${convErr?.message}`)
   }
 
-  const cuerpo = m.text?.body ?? null
   const media = m.image ?? m.audio ?? m.video ?? m.document
   const tipo = TIPOS_CONOCIDOS.has(m.type) ? m.type : 'unsupported'
+
+  // El caption de una foto o un documento ES texto del cliente y vale igual
+  // que un mensaje. Antes se descartaba.
+  const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? null
+  const cuerpo = m.text?.body ?? caption ?? null
 
   // ON CONFLICT sobre wamid: Meta reintenta el mismo mensaje hasta 36h.
   const { error: msgErr } = await db
@@ -185,6 +195,10 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
         msg_type: tipo,
         body: cuerpo,
         media_mime: media?.mime_type ?? null,
+        // El id, no la URL: la URL de descarga de Meta vence a los ~5 minutos.
+        // Con el id se puede reintentar durante los ~30 días que Meta guarda
+        // el archivo.
+        media_id: media?.id ?? null,
         status: 'delivered',
         created_at: m.timestamp
           ? new Date(Number(m.timestamp) * 1000).toISOString()
@@ -245,9 +259,76 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
   // catch de POST, que lo escribe en wa_webhook_events.error.
   if (attrErr) throw new Error(`atribución: ${attrErr.message}`)
 
-  // El bot contesta solo. Se hace después de guardar y atribuir, para que el
-  // mensaje del cliente aparezca en el inbox aunque el asistente falle.
-  await responderAutomatico(db, convId as string)
+  // El bot contesta solo, pero DESPUÉS de responderle 200 a Meta.
+  //
+  // Antes esto se esperaba acá adentro y el 200 salía recién cuando Gemini
+  // terminaba: 1 a 3 segundos, y con una nota de voz —que hay que bajar y
+  // transcribir— pasa de 10. Meta reintenta el webhook cuando tarda, y cada
+  // reintento es otro mensaje al cliente.
+  //
+  // `after` de Next 16 corre el trabajo con la respuesta ya enviada.
+  after(async () => {
+    try {
+      // Si vino una nota de voz, primero hay que saber qué dice: sin eso
+      // Sofía ve "[audio]" y contesta cualquier cosa.
+      if (m.type === 'audio' && media?.id) {
+        await procesarAudio(db, m.id, media.id)
+      }
+      await responderAutomatico(db, convId as string)
+    } catch (e) {
+      console.error('[wa-webhook] trabajo diferido:', e instanceof Error ? e.message : e)
+    }
+  })
+}
+
+/**
+ * Baja la nota de voz, la guarda y la transcribe sobre el mismo mensaje.
+ *
+ * El orden importa: primero se guarda el archivo y después se transcribe. Si
+ * la transcripción falla, al menos el audio quedó y se puede escuchar desde el
+ * inbox — que es peor que tenerlo transcrito, pero mucho mejor que un
+ * "[audio]" sin nada detrás.
+ */
+async function procesarAudio(db: Db, wamid: string, mediaId: string) {
+  const token = process.env.WHATSAPP_TOKEN
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!token) return
+
+  const archivo = await descargarMedia(mediaId, token)
+  if (!archivo) return
+
+  const ext = archivo.mime.includes('mpeg') ? 'mp3' : archivo.mime.includes('mp4') ? 'm4a' : 'ogg'
+  const ruta = `audio/${mediaId}.${ext}`
+
+  const { error: upErr } = await db.storage
+    .from('wa-media')
+    .upload(ruta, archivo.datos, { contentType: archivo.mime.split(';')[0], upsert: true })
+
+  if (upErr) console.error('[wa-webhook] subir audio:', upErr.message)
+  else await db.from('wa_messages').update({ media_path: ruta }).eq('wamid', wamid)
+
+  if (!apiKey) return
+
+  const t = await transcribirAudio({
+    apiKey,
+    modelo: process.env.GEMINI_MODEL,
+    datos: archivo.datos,
+    mime: archivo.mime,
+  })
+  if (!t) return
+
+  // El costo del audio se registra aparte: son ~32 tokens por segundo y a otro
+  // precio que el texto. Mezclarlo daría un total más bajo que la factura.
+  await db.from('ia_uso').insert({
+    modelo: t.modelo, contexto: 'transcripcion',
+    tokens_in: t.tokensIn, tokens_out: t.tokensOut,
+  })
+
+  // Aunque salga [inaudible] se guarda: en el inbox es más honesto ver "no se
+  // entendió" que ver el mensaje vacío y no saber si falló algo.
+  await db.from('wa_messages')
+    .update({ body: t.texto, transcrito: true })
+    .eq('wamid', wamid)
 }
 
 async function actualizarEstado(db: Db, s: MetaEstado) {
