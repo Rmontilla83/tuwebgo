@@ -72,14 +72,18 @@ export default function CampaignsPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    const [campaignsRes, expensesRes, leadsRes] = await Promise.all([
+    const [campaignsRes, expensesRes, leadsRes, stagesRes] = await Promise.all([
       supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('campaign_expenses').select('*'),
       supabase.from('leads').select('campaign_id, current_stage, amount_paid'),
+      supabase.from('pipeline_stages').select('slug, is_won'),
     ])
 
     // Sin esto un fallo de permisos se veía igual que "no hay campañas".
-    setLoadError(firstError({ campañas: campaignsRes, gastos: expensesRes, leads: leadsRes }))
+    setLoadError(firstError({ campañas: campaignsRes, gastos: expensesRes, leads: leadsRes, etapas: stagesRes }))
+
+    // "Ganado" sale de pipeline_stages.is_won, no de slugs quemados.
+    const ganadas = new Set((stagesRes.data ?? []).filter(s => s.is_won).map(s => s.slug))
 
     const campaignsData = campaignsRes.data
     const expenses = expensesRes.data
@@ -92,7 +96,7 @@ export default function CampaignsPage() {
     for (const c of campaignsData || []) {
       const cExpenses = (expenses || []).filter(e => e.campaign_id === c.id)
       const cLeads = (leads || []).filter(l => l.campaign_id === c.id)
-      const wonLeads = cLeads.filter(l => l.current_stage === 'pagado' || l.current_stage === 'entregado')
+      const wonLeads = cLeads.filter(l => ganadas.has(l.current_stage))
       const totalSpend = cExpenses.reduce((s, e) => s + Number(e.amount), 0)
       const revenue = wonLeads.reduce((s, l) => s + (Number(l.amount_paid) || 0), 0)
 

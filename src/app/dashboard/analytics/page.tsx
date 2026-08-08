@@ -25,11 +25,12 @@ const PLAN_LABELS: Record<string, string> = {
 async function getAnalytics() {
   const supabase = await createClient()
 
-  const [sessionsRes, eventsRes, leadsRes, ctaRes] = await Promise.all([
+  const [sessionsRes, eventsRes, leadsRes, ctaRes, stagesRes] = await Promise.all([
     supabase.from('sessions').select('device_type, utm_source, utm_medium, utm_campaign, referrer, first_seen_at', { count: 'exact' }).limit(MAX_ROWS),
     supabase.from('events').select('event_type, event_data, session_id').eq('event_type', 'section_visible').limit(MAX_ROWS),
     supabase.from('leads').select('source_channel, plan_interested, plan_final, current_stage, amount_paid, campaign_id', { count: 'exact' }).limit(MAX_ROWS),
     supabase.from('events').select('event_data', { count: 'exact' }).eq('event_type', 'cta_click').limit(MAX_ROWS),
+    supabase.from('pipeline_stages').select('slug, is_won'),
   ])
 
   assertNoError({
@@ -37,7 +38,11 @@ async function getAnalytics() {
     'eventos de sección': eventsRes,
     leads: leadsRes,
     'clics CTA': ctaRes,
+    etapas: stagesRes,
   })
+
+  // El criterio de "ganado" sale de la tabla, no de slugs quemados.
+  const ganadas = new Set((stagesRes.data ?? []).filter(s => s.is_won).map(s => s.slug))
 
   const sessions = sessionsRes.data
   const events = eventsRes.data
@@ -50,7 +55,7 @@ async function getAnalytics() {
     const ch = lead.source_channel
     if (!channels[ch]) channels[ch] = { leads: 0, won: 0, revenue: 0 }
     channels[ch].leads++
-    if (lead.current_stage === 'pagado' || lead.current_stage === 'entregado') {
+    if (ganadas.has(lead.current_stage)) {
       channels[ch].won++
       channels[ch].revenue += Number(lead.amount_paid) || 0
     }

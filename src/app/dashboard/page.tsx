@@ -32,7 +32,10 @@ async function getMetrics() {
   const recentLeads = recentRes.data
   const stages = stagesRes.data
 
-  const wonLeads = leads?.filter(l => l.current_stage === 'pagado' || l.current_stage === 'entregado') || []
+  // is_won y no slugs quemados: la migración 008 renombró las etapas y estos
+  // filtros quedaron contando cero. El criterio de "ganado" vive en la tabla.
+  const ganadas = new Set((stages ?? []).filter(s => s.is_won).map(s => s.slug))
+  const wonLeads = leads?.filter(l => ganadas.has(l.current_stage)) || []
   const revenue = wonLeads.reduce((sum, l) => sum + Number(l.amount_paid ?? 0), 0)
 
   // Forecast ponderado
@@ -67,12 +70,12 @@ async function getMetrics() {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  nuevo: 'bg-blue-50 text-blue-600 border-blue-200',
-  contactado: 'bg-amber-50 text-amber-600 border-amber-200',
-  pre_diseno_enviado: 'bg-purple-50 text-purple-600 border-purple-200',
-  aprobado: 'bg-indigo-50 text-indigo-600 border-indigo-200',
-  pagado: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  entregado: 'bg-teal-50 text-teal-600 border-teal-200',
+  conversando: 'bg-blue-50 text-blue-600 border-blue-200',
+  por_cobrar: 'bg-amber-50 text-amber-600 border-amber-200',
+  prediseno_curso: 'bg-purple-50 text-purple-600 border-purple-200',
+  esperando_ok: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+  en_produccion: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  entregado_final: 'bg-teal-50 text-teal-600 border-teal-200',
   perdido: 'bg-red-50 text-red-500 border-red-200',
 }
 

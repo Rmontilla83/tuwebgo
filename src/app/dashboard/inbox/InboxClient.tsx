@@ -626,7 +626,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                     )}
                   </button>
                   <span className="flex-shrink-0 w-px h-4 bg-[var(--border)]" />
-                  {templatesForStage(conv.leads?.current_stage ?? 'nuevo').slice(0, 4).map((t) => (
+                  {templatesForStage(conv.leads?.current_stage ?? 'conversando').slice(0, 4).map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setBorrador(t.build({ nombre: conv.leads?.name, negocio: conv.leads?.business_name, plan: null, monto: null }))}

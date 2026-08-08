@@ -144,7 +144,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'primer_contacto',
     label: 'Primer contacto',
-    stages: ['nuevo'],
+    stages: ['conversando'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}! Soy Rafael de TuWebGo\n\n` +
@@ -155,7 +155,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'seguimiento',
     label: 'Seguimiento',
-    stages: ['contactado'],
+    stages: ['conversando'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}, ¿cómo va todo?\n\n` +
@@ -165,7 +165,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'pre_diseno_enviado',
     label: 'Pre-diseño enviado',
-    stages: ['pre_diseno_enviado'],
+    stages: ['esperando_ok'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}! Ya te mandé el pre-diseño\n\n` +
@@ -175,7 +175,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'cierre',
     label: 'Cierre / cobro',
-    stages: ['aprobado'],
+    stages: ['por_cobrar'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}! Perfecto, entonces arrancamos\n\n` +
@@ -186,7 +186,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'entrega',
     label: 'Entrega',
-    stages: ['pagado', 'entregado'],
+    stages: ['en_produccion', 'entregado_final'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}! Tu página ya está en línea\n\n` +
@@ -196,7 +196,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'reactivacion',
     label: 'Reactivación',
-    stages: ['perdido', 'contactado', 'nuevo'],
+    stages: ['perdido', 'conversando'],
     metaCategory: 'MARKETING',
     build: (v) =>
       `${saludo(v)}! ¿Cómo va${v.negocio ? ` ${v.negocio}` : ''}?\n\n` +
@@ -207,7 +207,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'pedir_datos',
     label: 'Pedir datos',
-    stages: ['nuevo', 'contactado', 'pre_diseno_enviado', 'aprobado'],
+    stages: ['por_cobrar', 'prediseno_curso', 'conversando'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}! Para avanzar necesito unas cositas:\n\n` +

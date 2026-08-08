@@ -27,11 +27,11 @@ export const SITIO = 'https://tuwebgo.net'
  * Un valor null significa "no toques la etapa".
  */
 export const ETAPA_POR_HANDOFF: Record<string, string | null> = {
-  quiere_comprar: 'aprobado',   // decidió: hay que cobrarle
+  quiere_comprar: 'por_cobrar',   // decidió: hay que cobrarle los $50
   queja: null,
   fuera_de_alcance: null,
   pide_humano: null,
 }
 
 /** Etapa a la que pasa un lead en cuanto empieza a conversar con Sofía. */
-export const ETAPA_CONVERSANDO = 'contactado'
+export const ETAPA_CONVERSANDO = 'conversando'

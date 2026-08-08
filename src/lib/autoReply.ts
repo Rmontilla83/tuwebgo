@@ -133,11 +133,14 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       const destino = handoff ? ETAPA_POR_HANDOFF[handoff] : ETAPA_CONVERSANDO
       const actual = (conv.leads as { current_stage?: string } | null)?.current_stage
 
-      // Solo avanza desde las etapas iniciales: si Rafael ya lo movió más
-      // adelante, el bot no lo hace retroceder.
+      // Solo avanza, nunca retrocede. Se compara por sort_order y no por una
+      // lista de slugs: la migración 008 renombró las etapas y una lista quemada
+      // dejó esto muerto sin que nadie lo notara.
+      const { data: ord } = await db.from('pipeline_stages').select('slug, sort_order')
+      const orden = new Map((ord ?? []).map((e) => [e.slug, e.sort_order]))
       const puedeMover =
-        destino && destino !== actual &&
-        (handoff ? ['nuevo', 'contactado'].includes(actual ?? '') : actual === 'nuevo')
+        !!destino && destino !== actual &&
+        (orden.get(destino) ?? 0) > (orden.get(actual ?? '') ?? 99)
 
       if (puedeMover) {
         const { error: etErr } = await db.from('leads')

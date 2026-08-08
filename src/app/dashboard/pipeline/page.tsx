@@ -18,12 +18,12 @@ type Activity = { id: number; lead_id: string; activity_type: string; content: s
 type Transition = { from_stage: string | null; to_stage: string; transitioned_at: string }
 
 const STAGE_THEME: Record<string, { border: string; dot: string; bg: string; tabActive: string }> = {
-  nuevo:              { border: 'border-t-blue-400',    dot: 'bg-blue-400',    bg: 'bg-blue-50/60',     tabActive: 'bg-blue-500 text-white' },
-  contactado:         { border: 'border-t-amber-400',   dot: 'bg-amber-400',   bg: 'bg-amber-50/60',    tabActive: 'bg-amber-500 text-white' },
-  pre_diseno_enviado: { border: 'border-t-purple-400',  dot: 'bg-purple-400',  bg: 'bg-purple-50/60',   tabActive: 'bg-purple-500 text-white' },
-  aprobado:           { border: 'border-t-indigo-400',  dot: 'bg-indigo-400',  bg: 'bg-indigo-50/60',   tabActive: 'bg-indigo-500 text-white' },
-  pagado:             { border: 'border-t-emerald-500', dot: 'bg-emerald-500', bg: 'bg-emerald-50/60',  tabActive: 'bg-emerald-500 text-white' },
-  entregado:          { border: 'border-t-teal-500',    dot: 'bg-teal-500',    bg: 'bg-teal-50/60',     tabActive: 'bg-teal-500 text-white' },
+  conversando:     { border: 'border-t-blue-400',    dot: 'bg-blue-400',    bg: 'bg-blue-50/60',    tabActive: 'bg-blue-500 text-white' },
+  por_cobrar:      { border: 'border-t-amber-400',   dot: 'bg-amber-400',   bg: 'bg-amber-50/60',   tabActive: 'bg-amber-500 text-white' },
+  prediseno_curso: { border: 'border-t-purple-400',  dot: 'bg-purple-400',  bg: 'bg-purple-50/60',  tabActive: 'bg-purple-500 text-white' },
+  esperando_ok:    { border: 'border-t-indigo-400',  dot: 'bg-indigo-400',  bg: 'bg-indigo-50/60',  tabActive: 'bg-indigo-500 text-white' },
+  en_produccion:   { border: 'border-t-emerald-500', dot: 'bg-emerald-500', bg: 'bg-emerald-50/60', tabActive: 'bg-emerald-500 text-white' },
+  entregado_final: { border: 'border-t-teal-500',    dot: 'bg-teal-500',    bg: 'bg-teal-50/60',    tabActive: 'bg-teal-500 text-white' },
 }
 const PLAN_LABELS: Record<string, string> = { pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' }
 const SOURCE_LABELS: Record<string, string> = { landing_page: 'Landing', instagram_dm: 'Instagram', referral: 'Referido', meta_ads_direct: 'Meta Ads', organic_wa: 'WhatsApp', other: 'Otro' }
@@ -48,7 +48,9 @@ function getDealAge(date: string): { text: string; days: number } {
 }
 
 function rottingLevel(days: number, stage: string): 'ok' | 'warm' | 'hot' {
-  const thresholds: Record<string, number> = { nuevo: 1, contactado: 2, pre_diseno_enviado: 3, aprobado: 3, pagado: 5, entregado: 7 }
+  // Días de tolerancia por etapa. 'Por cobrar' es el más corto a propósito: es
+  // el momento donde se gana o se pierde la venta.
+  const thresholds: Record<string, number> = { conversando: 2, por_cobrar: 1, prediseno_curso: 2, esperando_ok: 3, en_produccion: 5, entregado_final: 7 }
   const limit = thresholds[stage] || 3
   if (days >= limit * 2) return 'hot'
   if (days >= limit) return 'warm'
@@ -76,7 +78,10 @@ export default function PipelinePage() {
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [draggedLead, setDraggedLead] = useState<string | null>(null)
-  const [mobileTab, setMobileTab] = useState('nuevo')
+  // null y no un slug quemado: la 008 renombró las etapas y esto dejaba el
+  // panel móvil apuntando a una pestaña inexistente, mostrando "Sin leads"
+  // con 630 leads cargados. Se fija al cargar, con la primera etapa real.
+  const [mobileTab, setMobileTab] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -94,7 +99,9 @@ export default function PipelinePage() {
     ])
     // Antes: `setLeads(l || [])` — un fallo de RLS se veía igual que "no hay leads".
     setLoadError(firstError({ etapas: stagesRes, leads: leadsRes }))
-    setStages(stagesRes.data || [])
+    const etapas = stagesRes.data || []
+    setStages(etapas)
+    setMobileTab((actual) => actual ?? etapas.find((e) => !e.is_lost)?.slug ?? null)
     setLeads(leadsRes.data || [])
     setLoading(false)
   }, [supabase])

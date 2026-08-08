@@ -223,13 +223,21 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
     p_ref_code: refDelMensaje,
     p_nombre: nombrePerfil,
   })
-  if (attrErr) console.error('[wa-webhook] atribución:', attrErr.message)
+
+  // Se RELANZA en vez de solo loguear. Cuando la migración 008 renombró las
+  // etapas, esta función quedó insertando un slug inexistente y ningún WhatsApp
+  // de un número nuevo pudo crear su lead — durante horas y sin una sola señal,
+  // porque el error moría en un console.error que nadie mira. Ahora sube al
+  // catch de POST, que lo escribe en wa_webhook_events.error.
+  if (attrErr) throw new Error(`atribución: ${attrErr.message}`)
 
   if (!refDelMensaje) {
     const { error: venErr } = await db.rpc('wa_atribuir_por_ventana', {
       p_conv_id: convId,
       p_minutos: 45,
     })
+    // Esta sí es best-effort: no encontrar la sesión de origen es un resultado
+    // legítimo, no un fallo. Solo se registra si la llamada misma revienta.
     if (venErr) console.error('[wa-webhook] atribución por ventana:', venErr.message)
   }
 
