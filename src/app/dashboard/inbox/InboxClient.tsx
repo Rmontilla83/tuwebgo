@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPhoneVE, templatesForStage, waLink } from '@/lib/whatsapp'
+import { PLANTILLAS, previsualizar, type PlantillaWA } from '@/lib/waTemplates'
 import { ICONO_HANDOFF, IconChat, IconCerrar, IconAsistente, IconUsuario, IconMano, IconFlecha, IconEnlaceExterno } from '@/components/icons'
 
 export type Conversation = {
@@ -73,7 +74,9 @@ function ventana(conv: Conversation | null) {
   return { abierta: true, texto: `Ventana abierta · ${h}h ${m}m` }
 }
 
-export default function InboxClient({ initial }: { initial: Conversation[] }) {
+export type Etapa = { slug: string; label: string; sort_order: number }
+
+export default function InboxClient({ initial, etapas = [] }: { initial: Conversation[]; etapas?: Etapa[] }) {
   const supabase = useMemo(() => createClient(), [])
   const [convs, setConvs] = useState<Conversation[]>(initial)
   const [activa, setActiva] = useState<string | null>(null)
@@ -272,7 +275,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
     }
   }
 
-  /** Abre wa.me y deja constancia. Es el camino de la Fase 0 y el respaldo cuando la ventana está cerrada. */
+  /** Abre wa.me y deja constancia. Respaldo para cuando la Cloud API no puede enviar. */
   async function enviarPorDeeplink(texto: string) {
     const link = waLink(conv!.phone_e164, texto)
     if (!link) { setError('El teléfono de la conversación no es válido.'); return }
@@ -282,6 +285,45 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
       p_phone: conv!.phone_e164, p_body: texto, p_lead_id: conv!.lead_id, p_template: null,
     })
     if (err) setError(`Se abrió WhatsApp pero no se registró el mensaje: ${err.message}`)
+  }
+
+  /** Envía una plantilla aprobada. Es la única vía fuera de la ventana de 24h. */
+  async function enviarPlantilla(p: PlantillaWA) {
+    if (!conv || enviando) return
+    setError(null); setEnviando(true)
+    try {
+      // Los ejemplos de la plantilla se sustituyen por los datos reales del lead.
+      const params = p.ejemplos.map((_, i) =>
+        i === 0
+          ? (conv.leads?.name?.split(/\s+/)[0] ?? 'Hola')
+          : (conv.leads?.business_name ?? 'tu negocio')
+      )
+      const res = await fetch('/api/wa/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conv.id, plantilla: { name: p.name, params } }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? `Error ${res.status}`); return }
+      if (data.aviso) setError(data.aviso)
+    } catch {
+      setError('No se pudo enviar la plantilla.')
+    } finally { setEnviando(false) }
+  }
+
+  /** Mueve el lead de etapa sin salir de la conversación. */
+  async function cambiarEtapa(slug: string) {
+    if (!conv?.lead_id) return
+    const anterior = conv.leads?.current_stage
+    setConvs((prev) => prev.map((c) =>
+      c.id === conv.id && c.leads ? { ...c, leads: { ...c.leads, current_stage: slug } } : c))
+
+    const { error: err } = await supabase.from('leads').update({ current_stage: slug }).eq('id', conv.lead_id)
+    if (err) {
+      setError(`No se pudo cambiar la etapa: ${err.message}`)
+      setConvs((prev) => prev.map((c) =>
+        c.id === conv.id && c.leads && anterior ? { ...c, leads: { ...c.leads, current_stage: anterior } } : c))
+    }
   }
 
   async function enviar() {
@@ -378,14 +420,6 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
         </div>
       )}
 
-      {!convs.some((c) => c.last_direction === 'in') && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
-          <p className="text-xs text-amber-800">
-            <strong>Fase 0 — solo salientes.</strong> Podés escribir y queda registrado acá, pero el envío
-            se hace abriendo WhatsApp. Para <em>recibir</em> dentro del CRM hay que conectar la Cloud API de Meta.
-          </p>
-        </div>
-      )}
 
       <div className="grid lg:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-280px)] min-h-[420px]">
         {/* ── Lista ── */}
@@ -487,6 +521,29 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                 </button>
               </div>
 
+              {/* Etapa del lead, editable sin salir de la conversación */}
+              {conv.lead_id && etapas.length > 0 && (
+                <div className="px-4 py-2 border-b border-[var(--border-light)] flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex-shrink-0">Etapa</span>
+                  {etapas.map((e) => {
+                    const activa = conv.leads?.current_stage === e.slug
+                    return (
+                      <button
+                        key={e.slug}
+                        onClick={() => cambiarEtapa(e.slug)}
+                        className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                          activa
+                            ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                            : 'bg-[var(--bg-alt)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--primary)]/40'
+                        }`}
+                      >
+                        {e.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* Traspaso: el bot se apartó y hay algo que atender */}
               {!conv.bot_activo && conv.handoff_motivo && (
                 <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
@@ -529,6 +586,32 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
               </div>
 
               <div className="p-3 border-t border-[var(--border-light)]">
+                {/* Fuera de la ventana de 24h, Meta solo acepta plantillas aprobadas.
+                    En vez de bloquear el envío, ofrecemos las que hay. */}
+                {!v.abierta && (
+                  <div className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <p className="text-[11px] text-amber-900 mb-2">
+                      Pasaron más de 24 horas desde su último mensaje. Meta solo permite plantillas aprobadas.
+                    </p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {PLANTILLAS.map((p) => (
+                        <button
+                          key={p.name}
+                          onClick={() => enviarPlantilla(p)}
+                          disabled={enviando}
+                          title={previsualizar(p)}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 cursor-pointer transition-all"
+                        >
+                          {p.proposito}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-amber-800/70 mt-1.5">
+                      Si no está aprobada todavía, Meta la rechaza y te lo digo acá.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-2 mb-2 overflow-x-auto items-center" style={{ scrollbarWidth: 'none' }}>
                   <button
                     onClick={sugerir}

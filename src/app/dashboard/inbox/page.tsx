@@ -15,7 +15,9 @@ export default async function InboxPage() {
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .range(0, PAGE - 1)
 
-  assertNoError({ conversaciones: res })
+  const etapasRes = await supabase.from('pipeline_stages').select('slug, label, sort_order').order('sort_order')
 
-  return <InboxClient initial={(res.data as Conversation[]) ?? []} />
+  assertNoError({ conversaciones: res, etapas: etapasRes })
+
+  return <InboxClient initial={(res.data as Conversation[]) ?? []} etapas={etapasRes.data ?? []} />
 }

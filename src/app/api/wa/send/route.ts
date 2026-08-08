@@ -31,13 +31,18 @@ export async function POST(request: Request) {
     )
   }
 
-  let body: { conversationId?: string; phone?: string; leadId?: string; texto?: string }
+  let body: {
+    conversationId?: string; phone?: string; leadId?: string; texto?: string
+    plantilla?: { name: string; params: string[] }
+  }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Cuerpo inválido' }, { status: 400 })
   }
 
   const texto = (body.texto ?? '').trim()
-  if (!texto) return NextResponse.json({ error: 'Falta el texto' }, { status: 400 })
+  const plantilla = body.plantilla
+
+  if (!texto && !plantilla) return NextResponse.json({ error: 'Falta el texto o la plantilla' }, { status: 400 })
   if (!body.conversationId && !body.phone) {
     return NextResponse.json({ error: 'Falta conversationId o phone' }, { status: 400 })
   }
@@ -76,7 +81,9 @@ export async function POST(request: Request) {
     (conv.window_expires_at && new Date(conv.window_expires_at).getTime() > ahora) ||
     (conv.fep_expires_at && new Date(conv.fep_expires_at).getTime() > ahora)
 
-  if (!ventanaAbierta) {
+  // Las plantillas son justamente el permiso para escribir fuera de la ventana,
+  // así que solo el texto libre queda bloqueado.
+  if (!ventanaAbierta && !plantilla) {
     return NextResponse.json(
       {
         error: 'La ventana de 24 horas está cerrada. Fuera de ella Meta solo permite plantillas aprobadas.',
@@ -86,19 +93,39 @@ export async function POST(request: Request) {
     )
   }
 
+  const payload = plantilla
+    ? {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: conv.phone_e164,
+        type: 'template',
+        template: {
+          name: plantilla.name,
+          language: { code: 'es' },
+          ...(plantilla.params?.length
+            ? { components: [{ type: 'body', parameters: plantilla.params.map((t) => ({ type: 'text', text: t })) }] }
+            : {}),
+        },
+      }
+    : {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: conv.phone_e164,
+        type: 'text',
+        text: { preview_url: true, body: texto },
+      }
+
+  // Lo que se guarda en el hilo: la plantilla con las variables ya sustituidas,
+  // para que el historial muestre lo que el cliente realmente leyó.
+  const cuerpoRegistrado = texto || `[plantilla ${plantilla!.name}] ${(plantilla!.params ?? []).join(' · ')}`
+
   // ── Envío a Meta ──
   let respuesta: Response
   try {
     respuesta = await fetch(`https://graph.facebook.com/${GRAPH}/${phoneId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: conv.phone_e164,
-        type: 'text',
-        text: { preview_url: true, body: texto },
-      }),
+      body: JSON.stringify(payload),
     })
   } catch {
     return NextResponse.json({ error: 'No se pudo contactar la API de WhatsApp.' }, { status: 502 })
@@ -114,7 +141,7 @@ export async function POST(request: Request) {
       direction: 'out',
       channel: 'cloud_api',
       msg_type: 'text',
-      body: texto,
+      body: cuerpoRegistrado,
       status: 'failed',
       error_detail: detalle,
       sent_by: user.id,
@@ -130,8 +157,9 @@ export async function POST(request: Request) {
     wamid: wamid ?? null,
     direction: 'out',
     channel: 'cloud_api',
-    msg_type: 'text',
-    body: texto,
+    msg_type: plantilla ? 'template' : 'text',
+    body: cuerpoRegistrado,
+    template_name: plantilla?.name ?? null,
     status: 'sent',
     sent_by: user.id,
   })

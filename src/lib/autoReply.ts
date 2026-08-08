@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type TurnoConversacion } from '@/lib/gemini'
+import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO } from '@/lib/config'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 
@@ -125,6 +126,25 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       direction: 'out', channel: 'cloud_api', msg_type: 'text',
       body: texto, status: 'sent', por_bot: true,
     })
+
+    // Sofía mueve el lead solo en el tramo que ella controla. Lo que viene
+    // después de que entra dinero depende de hechos que no puede verificar.
+    if (conv.lead_id) {
+      const destino = handoff ? ETAPA_POR_HANDOFF[handoff] : ETAPA_CONVERSANDO
+      const actual = (conv.leads as { current_stage?: string } | null)?.current_stage
+
+      // Solo avanza desde las etapas iniciales: si Rafael ya lo movió más
+      // adelante, el bot no lo hace retroceder.
+      const puedeMover =
+        destino && destino !== actual &&
+        (handoff ? ['nuevo', 'contactado'].includes(actual ?? '') : actual === 'nuevo')
+
+      if (puedeMover) {
+        const { error: etErr } = await db.from('leads')
+          .update({ current_stage: destino }).eq('id', conv.lead_id)
+        if (etErr) console.error('[autoReply] etapa:', etErr.message)
+      }
+    }
 
     if (handoff) {
       await apartarse(db, convId, handoff)
