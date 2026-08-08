@@ -15,6 +15,8 @@ export type Conversation = {
   unread_count: number
   window_expires_at: string | null
   status: string
+  bot_activo: boolean
+  handoff_motivo: string | null
   leads?: { name: string | null; business_name: string | null; current_stage: string } | null
 }
 
@@ -27,7 +29,15 @@ type Message = {
   body: string | null
   status: string
   template_name: string | null
+  por_bot: boolean
   created_at: string
+}
+
+const MOTIVO_LEGIBLE: Record<string, string> = {
+  quiere_comprar: '💰 El cliente quiere comprar — te toca cerrar',
+  queja: '⚠️ Reclamo — atendelo vos',
+  fuera_de_alcance: '❓ Pidió algo fuera del catálogo',
+  pide_humano: '🙋 Pidió hablar con una persona',
 }
 
 function horaCorta(iso: string) {
@@ -64,7 +74,14 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
   const [busqueda, setBusqueda] = useState('')
   const [redactando, setRedactando] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [rt, setRt] = useState<'conectando' | 'ok' | 'error' | 'sin-sesion'>('conectando')
   const finRef = useRef<HTMLDivElement>(null)
+  const canalRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  // El callback de Realtime se registra una sola vez y necesita leer la
+  // conversación abierta actual, no la que había cuando se suscribió.
+  const activaRef = useRef<string | null>(null)
+  useEffect(() => { activaRef.current = activa }, [activa])
 
   const conv = convs.find((c) => c.id === activa) ?? null
 
@@ -94,33 +111,87 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
     if (!rpcErr) setConvs((prev) => prev.map((c) => (c.id === id ? { ...c, unread_count: 0 } : c)))
   }
 
-  // Realtime. Los setState viven dentro de callbacks de suscripción, que es
-  // justamente el uso para el que existen los efectos.
+  /**
+   * Realtime.
+   *
+   * CRÍTICO: con RLS activa hay que pasarle el JWT al socket ANTES de
+   * suscribir. Sin `realtime.setAuth()` el socket se conecta como `anon`, la
+   * RLS de wa_messages (SELECT solo para authenticated) filtra todo, y no
+   * llega ni un evento — sin ningún error visible. Ese era el motivo de que el
+   * inbox no se actualizara en vivo.
+   *
+   * Además hay que reaplicarlo cuando Supabase refresca el token (~1h), o la
+   * conexión se queda muda a la hora de estar abierta.
+   */
   useEffect(() => {
-    const canal = supabase
-      .channel('wa:inbox')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_conversations' }, () => { recargarConvs() })
-      .subscribe()
-    return () => { supabase.removeChannel(canal) }
-  }, [supabase, recargarConvs])
+    let cancelado = false
 
-  useEffect(() => {
-    if (!activa) return
-    const canal = supabase
-      .channel(`wa:conv:${activa}`)
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'wa_messages', filter: `conversation_id=eq.${activa}` },
-        (payload) => setMensajes((prev) => {
+    const aplicarAuth = async () => {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (token) await supabase.realtime.setAuth(token)
+      return !!token
+    }
+
+    const arrancar = async () => {
+      const hayToken = await aplicarAuth()
+      if (cancelado) return
+      if (!hayToken) { setRt('sin-sesion'); return }
+
+      const canal = supabase
+        .channel('wa:inbox')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_conversations' }, () => { recargarConvs() })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wa_messages' }, (payload) => {
           const nuevo = payload.new as Message
-          return prev.some((m) => m.id === nuevo.id) ? prev : [...prev, nuevo]
-        }))
-      .subscribe()
-    return () => { supabase.removeChannel(canal) }
-  }, [activa, supabase])
+          // Un solo canal para todo: filtramos en cliente por la conversación
+          // abierta. Menos sockets y no hay que resuscribir al cambiar de hilo.
+          setMensajes((prev) =>
+            nuevo.conversation_id === activaRef.current && !prev.some((m) => m.id === nuevo.id)
+              ? [...prev, nuevo]
+              : prev
+          )
+        })
+        .subscribe((estado) => {
+          if (cancelado) return
+          if (estado === 'SUBSCRIBED') setRt('ok')
+          else if (estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT') setRt('error')
+          else if (estado === 'CLOSED') setRt('conectando')
+        })
+
+      canalRef.current = canal
+    }
+
+    arrancar()
+
+    const { data: sub } = supabase.auth.onAuthStateChange((evento) => {
+      if (evento === 'TOKEN_REFRESHED' || evento === 'SIGNED_IN') aplicarAuth()
+    })
+
+    return () => {
+      cancelado = true
+      sub.subscription.unsubscribe()
+      if (canalRef.current) supabase.removeChannel(canalRef.current)
+    }
+  }, [supabase, recargarConvs])
 
   useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes.length])
 
-  /** Pide a Gemini el borrador de la próxima respuesta. No envía nada: llena el textarea. */
+  /** Alterna quién atiende: Sofía o Rafael. */
+  async function alternarBot(c: Conversation) {
+    const activar = !c.bot_activo
+    setConvs((prev) => prev.map((x) => (x.id === c.id ? { ...x, bot_activo: activar, handoff_motivo: activar ? null : x.handoff_motivo } : x)))
+
+    const { error: err } = activar
+      ? await supabase.rpc('wa_reactivar_bot', { p_conv_id: c.id })
+      : await supabase.rpc('wa_handoff', { p_conv_id: c.id, p_motivo: 'Rafael tomó el control' })
+
+    if (err) {
+      setError(`No se pudo cambiar quién atiende: ${err.message}`)
+      setConvs((prev) => prev.map((x) => (x.id === c.id ? { ...x, bot_activo: c.bot_activo, handoff_motivo: c.handoff_motivo } : x)))
+    }
+  }
+
+  /** Pide a Gemini el borrador. Útil cuando vos estás atendiendo y querés ayuda. */
   async function sugerir() {
     if (!conv || redactando) return
     setRedactando(true)
@@ -218,12 +289,31 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Inbox</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
-          {convs.length} conversaciones
-          {sinLeer > 0 && <span className="text-emerald-600 font-semibold"> · {sinLeer} sin leer</span>}
-        </p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Inbox</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            {convs.length} conversaciones
+            {sinLeer > 0 && <span className="text-emerald-600 font-semibold"> · {sinLeer} sin leer</span>}
+          </p>
+        </div>
+        <button
+          onClick={() => recargarConvs()}
+          title={
+            rt === 'ok' ? 'Conectado en vivo — los mensajes entran solos'
+            : rt === 'error' ? 'Se perdió la conexión en vivo. Tocá para recargar.'
+            : rt === 'sin-sesion' ? 'Sin sesión activa. Volvé a entrar.'
+            : 'Conectando…'
+          }
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] cursor-pointer flex-shrink-0"
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            rt === 'ok' ? 'bg-emerald-500'
+            : rt === 'error' || rt === 'sin-sesion' ? 'bg-red-500'
+            : 'bg-amber-400 animate-pulse'
+          }`} />
+          {rt === 'ok' ? 'En vivo' : rt === 'error' ? 'Desconectado' : rt === 'sin-sesion' ? 'Sin sesión' : 'Conectando'}
+        </button>
       </div>
 
       {error && (
@@ -308,21 +398,56 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                   </p>
                   <p className="text-[11px] text-[var(--text-muted)] font-mono">{formatPhoneVE(conv.phone_e164)}</p>
                 </div>
-                <span className={`text-[10px] px-2 py-1 rounded-lg font-semibold flex-shrink-0 ${v.abierta ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-[var(--bg-alt)] text-[var(--text-muted)] border border-[var(--border-light)]'}`}>
+                <span className={`hidden sm:inline text-[10px] px-2 py-1 rounded-lg font-semibold flex-shrink-0 ${v.abierta ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-[var(--bg-alt)] text-[var(--text-muted)] border border-[var(--border-light)]'}`}>
                   {v.texto}
                 </span>
+                <button
+                  onClick={() => alternarBot(conv)}
+                  title={conv.bot_activo ? 'Sofía está atendiendo. Tocá para tomar el control.' : 'Vos estás atendiendo. Tocá para que Sofía siga.'}
+                  className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold flex-shrink-0 border cursor-pointer transition-all ${
+                    conv.bot_activo
+                      ? 'bg-[var(--primary-glow)] text-[var(--primary)] border-[var(--primary)]/30'
+                      : 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border)]'
+                  }`}
+                >
+                  {conv.bot_activo ? '✨ Sofía' : '👤 Vos'}
+                </button>
               </div>
+
+              {/* Traspaso: el bot se apartó y hay algo que atender */}
+              {!conv.bot_activo && conv.handoff_motivo && (
+                <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                  <p className="text-xs text-amber-800 flex-1 min-w-0">
+                    {MOTIVO_LEGIBLE[conv.handoff_motivo] ?? conv.handoff_motivo}
+                  </p>
+                  <button
+                    onClick={() => alternarBot(conv)}
+                    className="text-[10px] font-semibold text-amber-800 underline cursor-pointer flex-shrink-0"
+                  >
+                    Devolver a Sofía
+                  </button>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[var(--bg)]">
                 {mensajes.length === 0 && <p className="text-xs text-[var(--text-muted)] text-center py-8">Sin mensajes todavía</p>}
                 {mensajes.map((m) => (
                   <div key={m.id} className={`flex ${m.direction === 'out' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[78%] rounded-2xl px-3.5 py-2 ${m.direction === 'out' ? 'bg-emerald-500 text-white rounded-br-md' : 'bg-white border border-[var(--border-light)] text-[var(--dark)] rounded-bl-md'}`}>
+                    <div className={`max-w-[78%] rounded-2xl px-3.5 py-2 ${
+                      m.direction !== 'out'
+                        ? 'bg-white border border-[var(--border-light)] text-[var(--dark)] rounded-bl-md'
+                        : m.por_bot
+                          ? 'bg-[var(--primary)] text-white rounded-br-md'   // Sofía: índigo
+                          : 'bg-emerald-500 text-white rounded-br-md'        // Rafael: verde
+                    }`}>
+                      {m.direction === 'out' && m.por_bot && (
+                        <p className="text-[9px] font-semibold text-white/70 mb-0.5">✨ Sofía</p>
+                      )}
                       <p className="text-sm whitespace-pre-wrap break-words">{m.body || `[${m.msg_type}]`}</p>
                       <div className={`flex items-center gap-1.5 mt-1 ${m.direction === 'out' ? 'text-white/60' : 'text-[var(--text-muted)]'}`}>
                         <span className="text-[10px]">{horaCorta(m.created_at)}</span>
                         {m.channel === 'deeplink' && <span className="text-[9px]" title="Enviado abriendo WhatsApp">↗</span>}
-                        {m.status === 'failed' && <span className="text-[9px] text-red-300">falló</span>}
+                        {m.status === 'failed' && <span className="text-[9px] text-red-200">falló</span>}
                       </div>
                     </div>
                   </div>

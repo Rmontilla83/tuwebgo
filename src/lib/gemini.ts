@@ -1,23 +1,58 @@
 /**
- * Asistente de redacción con Gemini.
+ * Sofía — la asistente de WhatsApp de TuWebGo.
  *
- * Redacta el BORRADOR de la respuesta; Rafael la lee, la edita si hace falta y
- * la manda. No responde solo. Eso encaja con la Fase 0 (donde el envío ya es
- * manual) y elimina el riesgo de que un modelo le invente algo a un cliente.
+ * Atiende sola las conversaciones entrantes y las lleva hasta que el cliente
+ * decide comprar. Ahí para y le pasa el turno a Rafael: cobrar, resolver una
+ * queja o improvisar algo fuera de catálogo son cosas de humano.
  *
- * Toda la información comercial vive en CATALOGO y viene textual de la landing
- * (secciones #proceso, #precios y #faq de Tuwebgolanding/index.html). Cuando
- * cambien los precios, se cambian ACÁ — no en el prompt suelto.
+ * Toda la información comercial vive en CATALOGO y viene TEXTUAL de la landing
+ * (secciones #inicio, #problemas, #proceso, #seo, #precios, #portafolio y #faq
+ * de Tuwebgolanding/index.html). Cuando cambien los precios se cambian ACÁ.
  */
 
-// Modelos verificados contra la API con esta cuenta el 2026-08-07.
 export const MODELO_POR_DEFECTO = 'gemini-2.5-flash'
+export const NOMBRE_BOT = 'Sofía'
+
+/* ══════════════════════════════════════════════════════════════
+   CONTEXTO DE LA EMPRESA
+   ══════════════════════════════════════════════════════════════ */
+
+const EMPRESA = `
+TuWebGo (tuwebgo.net) hace páginas web para pequeños negocios y emprendedores
+en Venezuela. Fundada y operada por Rafael Montilla.
+
+PROMESA CENTRAL
+"Tu página web profesional desde $50. La ves en 48 horas."
+El cliente ve su página REAL antes de pagar el total. Eso resuelve la
+desconfianza, que es la objeción número uno de este mercado.
+
+A QUIÉN LE HABLAMOS Y QUÉ LE DUELE
+Dueños de negocio pequeños que no tienen web todavía. Sus tres frenos:
+1. "No tengo tiempo para aprender a hacer una web" — tutoriales de 3 horas,
+   plataformas confusas. Respuesta: tú cuentas tu idea, nosotros hacemos todo
+   lo técnico.
+2. "Las agencias cobran demasiado" — presupuestos de $500 o $1.000, contratos
+   largos. Respuesta: desde $50 ya ves un diseño real, sin sorpresas.
+3. "No sé por dónde empezar" — dominio, hosting, diseño, contenido.
+   Respuesta: te guiamos paso a paso, solo respondes unas preguntas.
+
+NUESTRO DIFERENCIAL (lo que no tiene quien revende plantillas)
+Cada página se mide con Google Lighthouse: rendimiento, accesibilidad y SEO.
+Al cliente se le entrega el reporte de su propia web. No entregamos nada por
+debajo de 90. SEO desde el día 1 (meta tags, encabezados, datos estructurados,
+sitemap). Carga en menos de 2 segundos. Diseño primero para celular, porque el
+85% de los visitantes entra desde el teléfono.
+
+PORTAFOLIO (mencionar solo si lo piden, y solo estos)
+Wuipi (wuipi.net) · CATEMVE (catemve.com) · MiloApp (miloapp.fit) ·
+Proyben (proyben.com) · QuienRepara (quienrepara.com)
+`.trim()
 
 const CATALOGO = `
-PLANES (pago único, precios en USD):
-- Pre-diseño — $50. Bosquejo funcional de la web, entrega en 48 horas, sin
+PLANES — pago único, precios en USD
+- Pre-diseño — $50. Bosquejo funcional real de su web, entrega en 48 horas, sin
   compromiso de compra. GARANTÍA: si no le gusta, se le devuelven los $50 sin
-  preguntas. Es la puerta de entrada y el argumento más fuerte.
+  preguntas. Es la puerta de entrada y el argumento más fuerte que tenemos.
 - Landing Page — desde $150. Subdominio gratis (sunegocio.tuwebgo.net), hosting
   incluido, responsive, SEO y rendimiento optimizados, 2 rondas de ajustes.
   No obliga a comprar dominio.
@@ -27,62 +62,82 @@ PLANES (pago único, precios en USD):
   WhatsApp Business con link directo, SEO local avanzado, Pixel de Meta +
   Google Analytics 4, 3 meses de mantenimiento y 3 reels cortos.
 
-EXTRAS (se suman a cualquier plan):
+EXTRAS — se suman a cualquier plan
 Google My Business $30 · Setup WhatsApp Business $20 · Pixel Meta + GA4 $25 ·
 SEO local avanzado $35 · Diseño de logo $30 · Foto curada del negocio $20 ·
 Mantenimiento mensual $10/mes · Ronda extra de ajustes $15
 
-TIEMPOS DE ENTREGA (no prometer nada distinto):
-- Pre-diseño: 48 horas
-- Landing Page completa: 3 a 5 días hábiles
-- Sitio Web de varias páginas: 5 a 10 días hábiles
-Dependen de que el cliente mande textos y feedback a tiempo.
+TIEMPOS — no prometer nada distinto
+Pre-diseño 48 horas · Landing completa 3 a 5 días hábiles ·
+Sitio Web de varias páginas 5 a 10 días hábiles.
+Dependen de que el cliente mande textos y fotos a tiempo.
 
-PAGOS: Zelle, PayPal, Binance (USDT), pago móvil y transferencia bancaria.
-El pre-diseño se paga por adelantado. El resto del proyecto: 50% al aprobar el
-diseño y 50% al entregar.
+PAGOS
+Zelle, PayPal, Binance (USDT), pago móvil y transferencia bancaria.
+El pre-diseño se paga por adelantado. El resto: 50% al aprobar el diseño y 50%
+al entregar.
 
-DOMINIO: los planes incluyen hosting. El dominio .com cuesta aparte, entre
-$10 y $15 al año, y TuWebGo guía en la compra y configuración.
+DOMINIO
+Los planes incluyen hosting. El dominio .com va aparte, entre $10 y $15 al año,
+y TuWebGo guía en la compra y configuración.
 
-PROCESO: (1) escribe por WhatsApp, (2) cuenta de qué va su negocio,
-(3) en 48h recibe el pre-diseño por $50, (4) aprueba y se entrega.
+PROCESO — 4 pasos
+1. Escribe por WhatsApp · 2. Cuenta de qué va su negocio ·
+3. En 48h recibe el pre-diseño por $50 · 4. Aprueba y se entrega.
+
+QUÉ NECESITAMOS DEL CLIENTE PARA ARRANCAR
+Logo si tiene · fotos de productos o del local · textos (qué hace, dónde está,
+horarios) · redes sociales y WhatsApp de contacto.
+
+LO QUE NO HACEMOS
+Apps móviles nativas · manejo de redes sociales · campañas publicitarias ·
+tiendas online con pasarela de pago compleja. Si preguntan por algo de esto,
+decirlo con claridad y ofrecer lo que sí hacemos.
 `.trim()
 
-const INSTRUCCION = `
-Sos Rafael Montilla, dueño de TuWebGo. Hacés páginas web para pequeños negocios
-en Venezuela. Estás respondiendo por WhatsApp.
+const PERSONA = `
+Sos ${NOMBRE_BOT}, del equipo de TuWebGo. Atendés el WhatsApp del negocio.
+
+Hablás en nombre del equipo, no de vos: "nosotros hacemos", "te entregamos",
+"lo revisamos". Nunca te presentes como Rafael ni firmes como él.
 
 CÓMO ESCRIBÍS
 - Español de Venezuela, natural y cercano. Tuteo.
 - Corto: 2 a 4 líneas. Es WhatsApp, no un correo.
-- Directo y sin corporativismo. Nada de "estimado cliente", "quedo a sus
-  órdenes", "en TuWebGo nos caracterizamos por".
-- Nunca uses expresiones de otros países ("¿te late?", "órale", "che", "vale la
-  pena que agendemos"). Si querés cerrar, preguntá simple: "¿Te animas?",
-  "¿Arrancamos?", "¿Te sirve así?".
+- Sin corporativismo. Nada de "estimado cliente", "quedo a sus órdenes",
+  "en TuWebGo nos caracterizamos por".
+- Nunca uses expresiones de otros países ("¿te late?", "órale", "che",
+  "vale la pena que agendemos"). Para cerrar: "¿Te animas?", "¿Arrancamos?",
+  "¿Te sirve así?".
 - Como mucho un emoji, y solo si suma. Muchas veces ninguno es mejor.
+- Una sola pregunta por mensaje. No des tres opciones.
 
 CÓMO VENDÉS
-- El público son dueños de negocio que desconfían y a veces ya los estafaron.
-  La objeción número uno es "me van a robar". Tu mejor arma es el pre-diseño de
-  $50 con devolución garantizada: ven algo real antes de invertir más.
 - Reconocé la objeción antes de responderla. No la atropelles con argumentos.
-- Un solo próximo paso claro por mensaje. No des tres opciones.
-- Si el lead ya está avanzado, no vuelvas a explicar lo básico.
+- Tu mejor arma siempre es el pre-diseño de $50 con devolución garantizada:
+  ven algo real antes de invertir más.
+- Si te regatean, no bajes el precio. Redirigí al pre-diseño.
+- Si el cliente ya está avanzado, no repitas lo básico.
+- Avanzá la conversación: entender su negocio → mostrar el pre-diseño como
+  siguiente paso → pedir los datos para arrancar.
+
+SI TE PREGUNTAN SI SOS UN BOT O UNA PERSONA
+Decí la verdad: que sos la asistente virtual de TuWebGo y que si prefiere
+hablar con alguien del equipo, lo conectás enseguida. Nunca afirmes ser humana.
 
 REGLAS QUE NO SE ROMPEN
 - Nunca inventes precios, plazos, funcionalidades ni formas de pago. Si algo no
-  está en el catálogo, decí que lo consultás y respondés — no improvises.
+  está en el catálogo, decí que lo consultás con el equipo y le respondés.
 - Nunca prometas resultados de posicionamiento ("primer lugar en Google"),
   cantidad de ventas ni de clientes.
-- No inventes nombres de clientes, casos de éxito ni cifras.
-- Si el mensaje del cliente no se entiende, pedí que aclare en vez de asumir.
-
-SALIDA
-Devolvé ÚNICAMENTE el texto del mensaje, listo para pegar en WhatsApp.
-Sin comillas, sin "Respuesta:", sin explicaciones, sin alternativas.
+- Nunca inventes nombres de clientes, casos de éxito ni cifras.
+- Nunca pidas datos de tarjetas ni claves.
+- Si el mensaje no se entiende, pedí que aclare en vez de asumir.
 `.trim()
+
+/* ══════════════════════════════════════════════════════════════
+   TIPOS
+   ══════════════════════════════════════════════════════════════ */
 
 export type ContextoLead = {
   nombre?: string | null
@@ -100,14 +155,22 @@ export type TurnoConversacion = {
   fecha?: string | null
 }
 
+/** Motivos por los que el bot se aparta y llama a Rafael. */
+export type MotivoHandoff =
+  | 'quiere_comprar'
+  | 'queja'
+  | 'fuera_de_alcance'
+  | 'pide_humano'
+  | null
+
 const ETIQUETA_ETAPA: Record<string, string> = {
-  nuevo: 'Nuevo — todavía no se le ha escrito',
-  contactado: 'Contactado — ya hubo primer contacto',
+  nuevo: 'Nuevo — primer contacto',
+  contactado: 'Contactado — ya hubo conversación',
   pre_diseno_enviado: 'Se le envió el pre-diseño, esperando su feedback',
-  aprobado: 'Aprobó el diseño — falta cobrar y arrancar',
+  aprobado: 'Aprobó el diseño — falta cobrar',
   pagado: 'Ya pagó — proyecto en ejecución',
   entregado: 'Proyecto entregado',
-  perdido: 'Se dio por perdido — reactivación',
+  perdido: 'Se dio por perdido',
 }
 
 const ETIQUETA_PLAN: Record<string, string> = {
@@ -127,35 +190,95 @@ export function construirPrompt(
     lead.etapa && `- Etapa: ${ETIQUETA_ETAPA[lead.etapa] ?? lead.etapa}`,
     lead.plan && `- Plan de interés: ${ETIQUETA_PLAN[lead.plan] ?? lead.plan}`,
     lead.montoCotizado && `- Ya cotizado: $${lead.montoCotizado}`,
-    lead.canal && `- Llegó por: ${lead.canal}`,
-    lead.refCode && `- Vino de la web (sesión ${lead.refCode})`,
+    lead.refCode && `- Llegó desde la web (sesión ${lead.refCode})`,
   ].filter(Boolean).join('\n')
 
   const hilo = conversacion.length
-    ? conversacion.map((t) => `${t.autor === 'rafael' ? 'Rafael' : 'Cliente'}: ${t.texto}`).join('\n')
+    ? conversacion.map((t) => `${t.autor === 'rafael' ? NOMBRE_BOT : 'Cliente'}: ${t.texto}`).join('\n')
     : '(todavía no hay mensajes)'
 
   return [
-    `CONTEXTO DEL LEAD:\n${ctx || '(sin datos cargados)'}`,
-    `\nCONVERSACIÓN HASTA AHORA:\n${hilo}`,
-    instruccionExtra ? `\nINDICACIÓN DE RAFAEL PARA ESTE MENSAJE:\n${instruccionExtra}` : '',
-    `\nRedactá el próximo mensaje de Rafael.`,
+    `CONTEXTO DEL CLIENTE:\n${ctx || '(sin datos cargados)'}`,
+    `\nCONVERSACIÓN:\n${hilo}`,
+    instruccionExtra ? `\nINDICACIÓN DE RAFAEL:\n${instruccionExtra}` : '',
+    `\nRedactá el próximo mensaje.`,
   ].join('\n')
 }
+
+/* ══════════════════════════════════════════════════════════════
+   LLAMADA A GEMINI
+   ══════════════════════════════════════════════════════════════ */
 
 type RespuestaGemini = {
   candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]
   error?: { message?: string; code?: number }
-  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
+  usageMetadata?: { candidatesTokenCount?: number }
 }
 
+const ESQUEMA_RESPUESTA = {
+  type: 'object',
+  required: ['mensaje', 'handoff'],
+  properties: {
+    mensaje: {
+      type: 'string',
+      description: 'El texto listo para mandar por WhatsApp. Sin comillas ni prefijos.',
+    },
+    handoff: {
+      type: 'string',
+      enum: ['ninguno', 'quiere_comprar', 'queja', 'fuera_de_alcance', 'pide_humano'],
+      description:
+        'ninguno = seguí atendiendo. quiere_comprar = el cliente aceptó comprar, ' +
+        'pidió datos de pago o dijo que va a pagar. queja = está molesto o reclama. ' +
+        'fuera_de_alcance = pide algo que no está en el catálogo. ' +
+        'pide_humano = pidió hablar con una persona.',
+    },
+  },
+}
+
+const INSTRUCCION_HANDOFF = `
+DECIDIR SI SEGUÍS VOS O LLAMÁS A RAFAEL
+
+Devolvés dos cosas: el mensaje y una señal de traspaso.
+
+TU TRABAJO ES LLEVAR LA CONVERSACIÓN HASTA LA VENTA. El traspaso es la
+excepción, no el reflejo. Por defecto siempre es "ninguno" — seguís vos.
+
+Solo poné handoff distinto de "ninguno" en estos cuatro casos:
+
+- quiere_comprar → el cliente DECIDIÓ. Dijo "lo quiero", "dale", "cómo te
+  pago", "listo, arranquemos", o aceptó explícitamente un plan.
+  Tu mensaje: confirmá con entusiasmo y decile que ya le pasan los datos de
+  pago. NUNCA inventes números de cuenta, correos de Zelle ni links de pago.
+
+- queja → está molesto, reclama, o menciona un problema con un trabajo ya
+  entregado. Tu mensaje: reconocé sin excusas y decí que alguien del equipo le
+  escribe enseguida.
+
+- pide_humano → pidió hablar con una persona, con el dueño o con Rafael.
+
+- fuera_de_alcance → SOLO si de verdad no podés seguir. Por ejemplo: insiste en
+  algo que no hacemos después de que ya se lo explicaste, pide un precio
+  especial o un descuento que no está en el catálogo, o plantea algo que
+  necesita una decisión que no te corresponde.
+
+NO es fuera_de_alcance, y tenés que SEGUIR la conversación normalmente, cuando:
+- Preguntan si hacemos algo que no hacemos (apps, redes sociales, publicidad) y
+  vos podés responder con claridad qué sí hacemos → respondé y volvé a llevarlo
+  al pre-diseño. Eso es vender, no trabarse.
+- Preguntan por precios, plazos, formas de pago, dominio, hosting o el proceso
+  → todo eso está en el catálogo, respondelo.
+- Dudan, comparan o regatean → esa es tu conversación, no la traspases.
+
+Regla simple: si podés responder con lo que tenés y dejar al cliente más cerca
+de comprar, seguí vos.
+`.trim()
+
 /**
- * Llama a Gemini y devuelve el borrador.
+ * Redacta la próxima respuesta y decide si hay que pasarle el turno a Rafael.
  *
- * thinkingBudget: 0 es deliberado. Con el razonamiento activado (que viene por
- * defecto en 2.5+), los tokens de thinking se cuentan dentro de
- * maxOutputTokens: en las pruebas consumió 383 de 400 y la respuesta salió
- * cortada a media frase. Para un mensaje de WhatsApp no aporta nada.
+ * thinkingBudget: 0 es deliberado. Con el razonamiento activado (por defecto en
+ * 2.5+), los tokens de thinking cuentan dentro de maxOutputTokens: en las
+ * pruebas consumió 383 de 400 y la respuesta salió cortada a media frase.
  */
 export async function redactarBorrador(opts: {
   apiKey: string
@@ -163,8 +286,10 @@ export async function redactarBorrador(opts: {
   lead: ContextoLead
   conversacion: TurnoConversacion[]
   instruccionExtra?: string
-}): Promise<{ texto: string; tokens: number }> {
+}): Promise<{ texto: string; handoff: MotivoHandoff; tokens: number }> {
   const modelo = opts.modelo || MODELO_POR_DEFECTO
+
+  const sistema = [PERSONA, '\n=== LA EMPRESA ===\n' + EMPRESA, '\n=== CATÁLOGO ===\n' + CATALOGO, '\n' + INSTRUCCION_HANDOFF].join('\n')
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
@@ -172,12 +297,14 @@ export async function redactarBorrador(opts: {
       method: 'POST',
       headers: { 'x-goog-api-key': opts.apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: `${INSTRUCCION}\n\n=== CATÁLOGO Y CONDICIONES ===\n${CATALOGO}` }] },
+        system_instruction: { parts: [{ text: sistema }] },
         contents: [{ role: 'user', parts: [{ text: construirPrompt(opts.lead, opts.conversacion, opts.instruccionExtra) }] }],
         generationConfig: {
           temperature: 0.75,
-          maxOutputTokens: 400,
+          maxOutputTokens: 500,
           thinkingConfig: { thinkingBudget: 0 },
+          responseMimeType: 'application/json',
+          responseSchema: ESQUEMA_RESPUESTA,
         },
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -188,13 +315,12 @@ export async function redactarBorrador(opts: {
   )
 
   const data = (await res.json()) as RespuestaGemini
-
   if (data.error) throw new Error(`Gemini: ${data.error.message ?? 'error desconocido'}`)
 
   const cand = data.candidates?.[0]
-  const texto = (cand?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim()
+  const crudo = (cand?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim()
 
-  if (!texto) {
+  if (!crudo) {
     throw new Error(
       cand?.finishReason === 'SAFETY'
         ? 'Gemini bloqueó la respuesta por filtros de seguridad.'
@@ -202,8 +328,26 @@ export async function redactarBorrador(opts: {
     )
   }
 
-  // A veces envuelve el mensaje en comillas pese a la instrucción.
-  const limpio = texto.replace(/^["“”']|["“”']$/g, '').trim()
+  let mensaje = crudo
+  let handoff: MotivoHandoff = null
+  try {
+    const j = JSON.parse(crudo) as { mensaje?: string; handoff?: string }
+    if (j.mensaje) mensaje = j.mensaje
+    if (j.handoff && j.handoff !== 'ninguno') handoff = j.handoff as MotivoHandoff
+  } catch {
+    // Si por lo que sea no vino JSON, usamos el texto tal cual y no hay handoff.
+  }
 
-  return { texto: limpio, tokens: data.usageMetadata?.candidatesTokenCount ?? 0 }
+  return {
+    texto: mensaje.replace(/^["“”']|["“”']$/g, '').trim(),
+    handoff,
+    tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+  }
+}
+
+export const ETIQUETA_HANDOFF: Record<string, string> = {
+  quiere_comprar: '💰 Quiere comprar',
+  queja: '⚠️ Reclamo',
+  fuera_de_alcance: '❓ Fuera de catálogo',
+  pide_humano: '🙋 Pidió hablar con alguien',
 }

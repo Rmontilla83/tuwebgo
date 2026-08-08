@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
+import { SITIO, WA_BASE } from '@/lib/config'
 
 type Campaign = {
   id: string
@@ -379,8 +380,11 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
   })
   const [copied, setCopied] = useState('')
 
-  const baseUrl = 'https://tuwebgo.net'
-  const waBase = 'https://wa.me/584128370378'
+  // Antes estaban quemados acá, y el de WhatsApp quedó apuntando al número
+  // viejo cuando migramos a la Cloud API: los enlaces Click-to-WhatsApp de las
+  // campañas habrían mandado el tráfico pago fuera del CRM.
+  const baseUrl = SITIO
+  const waBase = WA_BASE
 
   const params = new URLSearchParams()
   if (form.source) params.set('utm_source', form.source)

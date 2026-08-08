@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractRefCode } from '@/lib/whatsapp'
+import { responderAutomatico } from '@/lib/autoReply'
 
 export const runtime = 'nodejs'
 // Meta reintenta hasta 36h si no recibe 200 rápido. Nada de cachear.
@@ -214,6 +215,10 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
     p_nombre: nombrePerfil,
   })
   if (attrErr) console.error('[wa-webhook] atribución:', attrErr.message)
+
+  // El bot contesta solo. Se hace después de guardar y atribuir, para que el
+  // mensaje del cliente aparezca en el inbox aunque el asistente falle.
+  await responderAutomatico(db, convId as string)
 }
 
 async function actualizarEstado(db: Db, s: MetaEstado) {
