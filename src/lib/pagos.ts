@@ -84,6 +84,32 @@ const ETIQUETA_PRECIO: Record<number, string> = {
 }
 
 /**
+ * Los datos de cobro listos para PEGAR en un mensaje.
+ *
+ * Esto es lo que el código adjunta cuando Sofía marca enviar_datos_pago. Nunca
+ * los escribe ella: en las pruebas end-to-end, una de cada tres veces daba
+ * solo el Zelle y se comía el pago móvil con su monto en bolívares — y la
+ * mitad de los clientes paga en bolívares. Misma regla que con los enlaces:
+ * una cadena que tiene que salir exacta no se le delega a un LLM.
+ */
+export async function datosPagoTexto(montoUsd?: number | null): Promise<string> {
+  const tasa = await obtenerTasaBcv()
+  // Si el lead tiene un monto cotizado de la lista, se usa; si no, el
+  // pre-diseño de $50, que es lo que se está cobrando el 95% de las veces.
+  const monto = montoUsd && PRECIOS_USD.includes(montoUsd) ? montoUsd : 50
+
+  const lineas = [
+    `Zelle: ${ZELLE.correo} — a nombre de ${ZELLE.titular}`,
+    `Pago móvil: ${PAGO_MOVIL.banco} (${PAGO_MOVIL.codigoBanco}) · ${PAGO_MOVIL.telefono} · ${PAGO_MOVIL.cedula}`,
+    `Binance (${BINANCE.moneda}): ${BINANCE.usuario}`,
+  ]
+  if (tasa) {
+    lineas.push(`$${monto} = Bs. ${bolivares(monto * tasa.bs)} a la tasa BCV de hoy`)
+  }
+  return lineas.join('\n')
+}
+
+/**
  * Arma el bloque de pagos con la tasa del día ya resuelta.
  *
  * Se llama en cada respuesta y no una vez al arrancar: la tasa cambia todos los
@@ -139,7 +165,8 @@ export async function bloquePagos(enlaceFormulario?: string): Promise<string> {
       ].join('\n')
 
   return `
-FORMAS DE PAGO — datos reales, se pueden dar tal cual
+FORMAS DE PAGO — para que las conozcas y respondas dudas. En el mensaje NO las
+escribes tú: el sistema las pega (ver más abajo).
 
 Zelle
   Correo: ${ZELLE.correo}
@@ -157,24 +184,20 @@ ${conversion}
 
 CUÁNDO DAR LOS DATOS Y CÓMO
 
-Apenas el cliente decida comprar o pregunte cómo pagar.
+Apenas el cliente decida comprar o pregunte cómo pagar, marca
+enviar_datos_pago en true.
 
-ESCRIBE LOS DATOS COMPLETOS EN EL MENSAJE. Nombrar los métodos sin los datos no
-sirve de nada: obliga al cliente a pedirlos otra vez y ahí se enfría la venta.
-Esto es lo único que puede hacer que esta conversación termine en plata, así que
-acá sí te puedes pasar de las 4 líneas.
+NO ESCRIBAS TÚ LOS DATOS (correos, teléfonos, cédulas, montos): el sistema los
+pega completos al final de tu mensaje, siempre exactos y con el monto en
+bolívares del día. Tu mensaje es la introducción y la pregunta de cierre.
 
-  MAL:  "Puedes pagar con Zelle, pago móvil o Binance. ¿Cuál prefieres?"
-        "Te mandamos los datos para el pago."
+  MAL:  "Puedes pagar por Zelle a pagos@bahalu.com..."
+        (los escribiste tú: a veces sale uno solo o con un dato cambiado)
 
-  BIEN: "Son $50. Por Zelle: ${ZELLE.correo}, a nombre de ${ZELLE.titular}.
-         Por pago móvil son Bs. [monto]: ${PAGO_MOVIL.banco} ${PAGO_MOVIL.codigoBanco},
-         ${PAGO_MOVIL.telefono}, cédula ${PAGO_MOVIL.cedula}.
-         ¿Por cuál lo vas a hacer?"
+  BIEN: "¡Listo! Son $50. Aquí te dejo los datos — ¿por cuál lo vas a hacer?"
+        (y el sistema pega debajo Zelle, pago móvil, Binance y el monto en Bs)
 
-Manda Zelle y pago móvil juntos, que son los que usa casi todo el mundo.
-Binance${STRIPE_LINK ? ' y el link de tarjeta' : ''} solo si el cliente lo pide
-o si te dice que está fuera de Venezuela.
+${STRIPE_LINK ? 'El link de tarjeta va aparte: solo si el cliente lo pide o está fuera de Venezuela.' : ''}
 
 SI PIDE UNA FORMA DE PAGO QUE NO ESTÁ EN ESTA LISTA
 No la inventes. Ofrece las que sí tienes y, si insiste, dile que le pasan los

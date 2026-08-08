@@ -4,6 +4,10 @@ import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, HANDOFF_PAUSA_BOT } from '@/lib/c
 import { urlFormulario } from '@/lib/pagos'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
+// En pruebas apunta a un doble local de la Graph API. En producción no se
+// define y queda el host real: probar el ciclo completo sin esto significaba
+// mandarle WhatsApps de verdad a alguien.
+const GRAPH_BASE = process.env.GRAPH_BASE_URL || 'https://graph.facebook.com'
 
 type Db = ReturnType<typeof createAdminClient>
 
@@ -71,7 +75,12 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       .order('created_at', { ascending: false })
       .limit(20)
 
-    const historial: TurnoConversacion[] = (msgs ?? [])
+    // OJO: copia antes de invertir. `.reverse()` MUTA el array, y `msgs` se
+    // vuelve a usar más abajo para registrar el pago reportado. La primera
+    // versión invertía en el lugar y el bloque de pago terminaba leyendo los
+    // mensajes MÁS VIEJOS: la tarea de verificación guardaba el "hola" inicial
+    // en vez de la referencia bancaria. Lo encontró la prueba end-to-end.
+    const historial: TurnoConversacion[] = [...(msgs ?? [])]
       .reverse()
       .map((m) => ({
         autor: m.direction === 'out' ? ('rafael' as const) : ('cliente' as const),
@@ -126,7 +135,7 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
     if (!texto.trim()) { await apartarse(db, convId, 'El asistente no pudo redactar'); return }
 
     // ── Envío ──
-    const res = await fetch(`https://graph.facebook.com/${GRAPH}/${phoneId}/messages`, {
+    const res = await fetch(`${GRAPH_BASE}/${GRAPH}/${phoneId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -195,7 +204,9 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       const { error: pagoErr } = await db.rpc('pago_reportar', {
         p_conv_id: convId,
         p_mensaje: ultimos.find((m) => m.body?.trim())?.body ?? '',
-        p_con_comprobante: ultimos.some((m) => ['image', 'document'].includes(m.msg_type ?? '')),
+        // El audio también cuenta: si el pago vino dicho en una nota de voz,
+        // esa grabación es el respaldo de lo que el cliente afirmó.
+        p_con_comprobante: ultimos.some((m) => ['image', 'document', 'audio'].includes(m.msg_type ?? '')),
       })
       if (pagoErr) console.error('[autoReply] registrar pago:', pagoErr.message)
     }

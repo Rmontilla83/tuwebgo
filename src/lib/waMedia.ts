@@ -1,6 +1,8 @@
 import { MODELO_POR_DEFECTO } from '@/lib/gemini'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
+// Mismo doble de pruebas que en autoReply: sin definir, host real.
+const GRAPH_BASE = process.env.GRAPH_BASE_URL || 'https://graph.facebook.com'
 
 /**
  * Archivos que llegan por WhatsApp: descarga y transcripción.
@@ -25,7 +27,7 @@ export async function descargarMedia(mediaId: string, token: string): Promise<{
   mime: string
 } | null> {
   try {
-    const metaRes = await fetch(`https://graph.facebook.com/${GRAPH}/${mediaId}`, {
+    const metaRes = await fetch(`${GRAPH_BASE}/${GRAPH}/${mediaId}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
       signal: AbortSignal.timeout(15000),

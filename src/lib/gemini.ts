@@ -15,7 +15,7 @@
  * de Tuwebgolanding/index.html). Cuando cambien los precios se cambian ACÁ.
  */
 
-import { bloquePagos, STRIPE_LINK } from '@/lib/pagos'
+import { bloquePagos, datosPagoTexto, STRIPE_LINK, ZELLE, PAGO_MOVIL } from '@/lib/pagos'
 
 export const MODELO_POR_DEFECTO = 'gemini-2.5-flash'
 export const NOMBRE_BOT = 'Sofía'
@@ -381,6 +381,14 @@ const ESQUEMA_RESPUESTA = {
         'crédito o débito. false para cualquier otro monto y para cualquier otra ' +
         'forma de pago. No escribas el enlace: se agrega solo.',
     },
+    enviar_datos_pago: {
+      type: 'boolean',
+      description:
+        'true si el cliente decidió comprar, aceptó un plan o pregunta cómo ' +
+        'pagar: el sistema agrega al final de tu mensaje los datos de cobro ' +
+        'completos (Zelle, pago móvil, Binance y el monto en bolívares del día). ' +
+        'No los escribas tú.',
+    },
     handoff: {
       type: 'string',
       enum: ['ninguno', 'quiere_comprar', 'pago_reportado', 'queja', 'fuera_de_alcance', 'pide_humano'],
@@ -509,15 +517,18 @@ export async function redactarBorrador(opts: {
   let handoff: MotivoHandoff = null
   let quiereFormulario = false
   let quiereTarjeta = false
+  let quiereDatosPago = false
   try {
     const j = JSON.parse(crudo) as {
       mensaje?: string; handoff?: string
       enviar_formulario?: boolean; enviar_link_tarjeta?: boolean
+      enviar_datos_pago?: boolean
     }
     if (j.mensaje) mensaje = j.mensaje
     if (j.handoff && j.handoff !== 'ninguno') handoff = j.handoff as MotivoHandoff
     quiereFormulario = j.enviar_formulario === true
     quiereTarjeta = j.enviar_link_tarjeta === true
+    quiereDatosPago = j.enviar_datos_pago === true
   } catch {
     // Si por lo que sea no vino JSON, usamos el texto tal cual y no hay handoff.
   }
@@ -549,6 +560,17 @@ export async function redactarBorrador(opts: {
     /https?:\/\/\S*brief\.html\S*/gi
   )
   adjuntar(quiereTarjeta, STRIPE_LINK || undefined, /https?:\/\/\S*buy\.stripe\.com\S*/gi)
+
+  // Los datos de cobro, mismo principio que los enlaces. En las pruebas
+  // end-to-end, una de cada tres veces el modelo daba solo el Zelle y se comía
+  // el pago móvil con el monto en bolívares. Si el modelo ya escribió los dos
+  // datos clave, no se duplica.
+  if (quiereDatosPago) {
+    const yaLosTiene = texto.includes(ZELLE.correo) && texto.includes(PAGO_MOVIL.telefono)
+    if (!yaLosTiene) {
+      texto += `\n\n${await datosPagoTexto(opts.lead?.montoCotizado)}`
+    }
+  }
 
   return {
     texto,
