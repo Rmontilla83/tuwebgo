@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
 import { SITIO, WA_BASE } from '@/lib/config'
 import { IconMegafono, IconCheck } from '@/components/icons'
+import CampanaWhatsApp from '@/components/CampanaWhatsApp'
+import ImportarContactos from '@/components/ImportarContactos'
 
 type Campaign = {
   id: string
@@ -70,6 +72,7 @@ export default function CampaignsPage() {
   const [showUtm, setShowUtm] = useState(false)
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [vista, setVista] = useState<'whatsapp'|'contactos'|'ads'>('whatsapp')
 
   const fetchData = useCallback(async () => {
     const [campaignsRes, expensesRes, leadsRes, stagesRes] = await Promise.all([
@@ -143,12 +146,12 @@ export default function CampaignsPage() {
           </button>
         </div>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Campañas</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">{campaigns.length} campañas registradas</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Contactar por WhatsApp y medir la publicidad</p>
         </div>
-        <div className="flex gap-2">
+        <div className={`gap-2 ${vista === 'ads' ? 'flex' : 'hidden'}`}>
           <button onClick={() => setShowUtm(true)} className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs sm:text-sm font-semibold text-[var(--primary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer">
             UTM
           </button>
@@ -158,6 +161,22 @@ export default function CampaignsPage() {
         </div>
       </div>
 
+      {/* WhatsApp primero: es lo que Rafael va a usar todos los días. La
+          publicidad pagada está apagada desde abril y va en su propia pestaña. */}
+      <div className="flex gap-1 mb-5 bg-[var(--bg-alt)] p-1 rounded-xl max-w-md">
+        {([['whatsapp','WhatsApp'],['contactos','Contactos'],['ads','Publicidad']] as const).map(([k,l]) => (
+          <button key={k} onClick={() => setVista(k)}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${
+              vista === k ? 'bg-white text-[var(--dark)] shadow-sm' : 'text-[var(--text-muted)]'
+            }`}>{l}</button>
+        ))}
+      </div>
+
+      {vista === 'whatsapp' && <CampanaWhatsApp />}
+      {vista === 'contactos' && <ImportarContactos onImportado={fetchData} />}
+
+      {vista === 'ads' && (
+      <>
       {/* Campaigns Table */}
       {campaigns.length === 0 ? (
         <div className="bg-[var(--card)] rounded-2xl p-12 border border-[var(--border)] text-center">
@@ -211,6 +230,9 @@ export default function CampaignsPage() {
             )
           })}
         </div>
+      )}
+
+      </>
       )}
 
       {/* New Campaign Modal */}

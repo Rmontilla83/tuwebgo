@@ -27,14 +27,20 @@ export async function GET() {
 
   try {
     const res = await fetch(
-      `https://graph.facebook.com/${GRAPH}/${cred.waba}/message_templates?fields=name,status,category,language,rejected_reason&limit=100`,
+      `https://graph.facebook.com/${GRAPH}/${cred.waba}/message_templates?fields=name,status,category,language,rejected_reason,quality_score,id&limit=100`,
       { headers: { Authorization: `Bearer ${cred.token}` }, cache: 'no-store' }
     )
     const datos = await res.json()
     if (!res.ok) {
       return NextResponse.json({ error: datos?.error?.message ?? `HTTP ${res.status}` }, { status: 502 })
     }
-    return NextResponse.json({ plantillas: datos.data ?? [] })
+    const lista = datos.data ?? []
+    return NextResponse.json({
+      plantillas: lista,
+      // Si Meta no devuelve NINGUNA, es que nunca llegaron — no que estén en
+      // revisión. Distinguir esos dos casos ahorra días de espera inútil.
+      ningunaRegistrada: lista.length === 0,
+    })
   } catch {
     return NextResponse.json({ error: 'No se pudo consultar a Meta.' }, { status: 502 })
   }

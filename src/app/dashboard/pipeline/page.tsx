@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
-import WhatsAppPanel from '@/components/WhatsAppPanel'
 import { normalizePhoneVE } from '@/lib/whatsapp'
 import { ICONO_ACTIVIDAD, IconNota, IconEtapa, IconCarpeta, IconWhatsApp, IconUsuario, IconLista } from '@/components/icons'
 
@@ -438,7 +437,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
   const [newNote, setNewNote] = useState('')
   const [noteType, setNoteType] = useState('note')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [tab, setTab] = useState<'edit'|'whatsapp'|'timeline'>('edit')
+  const [tab, setTab] = useState<'edit'|'timeline'>('edit')
   const [modalError, setModalError] = useState<string|null>(null)
   const set = (k:string,v:string) => setForm(p=>({...p,[k]:v}))
 
@@ -467,10 +466,22 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
 
   return (
     <Modal title={lead.name||'Lead'} icon={<IconLista className="w-4 h-4" />} onClose={onClose}>
+      {/* Un botón, no un panel: escribir se hace en el Inbox, que es donde vive
+          la conversación completa y donde Sofía puede seguir. Duplicar acá un
+          compositor de mensajes creaba un tercer camino que confundía. */}
+      {normalizePhoneVE(lead.phone) && (
+        <Link
+          href={`/dashboard/inbox?tel=${normalizePhoneVE(lead.phone)}`}
+          className="flex items-center justify-center gap-2 w-full mb-4 py-3 rounded-xl bg-emerald-500 text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:brightness-110 transition-all active:scale-[0.98]"
+        >
+          <IconWhatsApp className="w-4 h-4" />
+          Ir a la conversación
+        </Link>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-[var(--bg-alt)] p-1 rounded-xl">
         <button onClick={()=>setTab('edit')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${tab==='edit'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Datos</button>
-        <button onClick={()=>setTab('whatsapp')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${tab==='whatsapp'?'bg-white text-emerald-600 shadow-sm':'text-[var(--text-muted)]'}`}>WhatsApp</button>
         <button onClick={()=>setTab('timeline')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${tab==='timeline'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Timeline ({activities.length + transitions.length})</button>
       </div>
 
@@ -480,21 +491,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
         </div>
       )}
 
-      {tab === 'whatsapp' ? (
-        <WhatsAppPanel
-          lead={{
-            id: lead.id,
-            name: form.name || lead.name,
-            phone: form.phone || lead.phone,
-            business_name: form.business_name || lead.business_name,
-            plan_interested: form.plan_interested || lead.plan_interested,
-            amount_quoted: form.amount_quoted ? parseFloat(form.amount_quoted) : lead.amount_quoted,
-            current_stage: form.current_stage,
-          }}
-          supabase={supabase}
-          onLogged={reloadActivities}
-        />
-      ) : tab === 'edit' ? (
+      {tab === 'edit' ? (
         <div className="space-y-4">
           <div className="flex items-center gap-3 mb-2 text-xs text-[var(--text-muted)]">
             <span>Creado {age.text}</span>

@@ -28,6 +28,7 @@ export default function PlantillasWA() {
   const [subiendo, setSubiendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [abierta, setAbierta] = useState<string | null>(null)
+  const [ninguna, setNinguna] = useState(false)
 
   async function consultar() {
     setCargando(true); setError(null)
@@ -36,6 +37,7 @@ export default function PlantillasWA() {
       const d = await res.json()
       if (!res.ok) { setError(d.error ?? `Error ${res.status}`); return }
       setEstados(d.plantillas ?? [])
+      setNinguna(!!d.ningunaRegistrada)
     } catch { setError('No se pudo conectar con Meta.') } finally { setCargando(false) }
   }
 
@@ -87,6 +89,27 @@ export default function PlantillasWA() {
           {cargando ? 'Consultando…' : 'Ver estado'}
         </button>
       </div>
+
+      {ninguna && (
+        <div className="mb-4 px-3 py-3 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-sm font-semibold text-red-800">Meta no tiene ninguna plantilla registrada</p>
+          <p className="text-xs text-red-700 mt-1">
+            No están &quot;en revisión&quot;: nunca llegaron. Dale a <strong>Subir las {PLANTILLAS.length} a Meta</strong> y
+            mirá el resultado de cada una — ahí sale el motivo si alguna es rechazada.
+          </p>
+        </div>
+      )}
+
+      {estados && !ninguna && estados.every(e => e.status === 'PENDING') && (
+        <div className="mb-4 px-3 py-3 rounded-xl bg-amber-50 border border-amber-200">
+          <p className="text-sm font-semibold text-amber-900">Todas siguen en revisión</p>
+          <p className="text-xs text-amber-800 mt-1">
+            Meta suele aprobar en minutos, pero con una cuenta nueva y sin verificación de negocio
+            puede tardar hasta 24 h — y las de categoría MARKETING siempre tardan más que las UTILITY.
+            Si pasan 48 h, verificá el negocio en Business Manager: es lo que más acelera la revisión.
+          </p>
+        </div>
+      )}
 
       {resultados && (
         <div className="mb-4 px-3 py-2.5 rounded-xl bg-[var(--bg-alt)] border border-[var(--border-light)]">
