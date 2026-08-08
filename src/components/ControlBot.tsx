@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { NOMBRE_BOT } from '@/lib/gemini'
+import { IconAsistente, IconUsuario } from '@/components/icons'
 
 /** Interruptor general del asistente. Apagarlo lo calla en TODAS las conversaciones. */
 export default function ControlBot() {
@@ -71,7 +72,7 @@ export default function ControlBot() {
       {activo && (
         <p className="text-[11px] text-[var(--text-muted)] mt-3 pt-3 border-t border-[var(--border-light)]">
           Si respondés a mano en una conversación, {NOMBRE_BOT} se calla ahí sola. Para que retome,
-          usá el botón <span className="font-semibold">👤 Vos / ✨ {NOMBRE_BOT}</span> en el Inbox.
+          usá el botón <span className="font-semibold inline-flex items-center gap-1"><IconUsuario className="w-3 h-3" />Vos / <IconAsistente className="w-3 h-3" />{NOMBRE_BOT}</span> en el Inbox.
         </p>
       )}
     </div>

@@ -31,14 +31,15 @@ export async function POST(request: Request) {
     )
   }
 
-  let body: { conversationId?: string; texto?: string }
+  let body: { conversationId?: string; phone?: string; leadId?: string; texto?: string }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Cuerpo inválido' }, { status: 400 })
   }
 
   const texto = (body.texto ?? '').trim()
-  if (!body.conversationId || !texto) {
-    return NextResponse.json({ error: 'Falta conversationId o texto' }, { status: 400 })
+  if (!texto) return NextResponse.json({ error: 'Falta el texto' }, { status: 400 })
+  if (!body.conversationId && !body.phone) {
+    return NextResponse.json({ error: 'Falta conversationId o phone' }, { status: 400 })
   }
   if (texto.length > 4096) {
     return NextResponse.json({ error: 'El mensaje supera los 4096 caracteres que acepta WhatsApp.' }, { status: 400 })
@@ -46,10 +47,24 @@ export async function POST(request: Request) {
 
   const db = createAdminClient()
 
+  // Se puede llamar con la conversación (desde el Inbox) o con un teléfono
+  // suelto (desde la ficha del lead, donde puede que aún no exista el hilo).
+  let convId = body.conversationId
+  if (!convId) {
+    const { data, error: rpcErr } = await db.rpc('wa_get_or_create_conversation', {
+      p_phone: body.phone,
+      p_lead_id: body.leadId ?? null,
+    })
+    if (rpcErr || !data) {
+      return NextResponse.json({ error: rpcErr?.message ?? 'Teléfono inválido' }, { status: 400 })
+    }
+    convId = data as string
+  }
+
   const { data: conv, error: convErr } = await db
     .from('wa_conversations')
     .select('id, phone_e164, window_expires_at, fep_expires_at')
-    .eq('id', body.conversationId)
+    .eq('id', convId)
     .single()
 
   if (convErr || !conv) {

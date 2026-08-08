@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { assertNoError } from '@/lib/supabase/errors'
+import { IconGrafico } from '@/components/icons'
 
 // Techo explícito por query. PostgREST puede truncar en silencio según la
 // config del proyecto; sin un límite declarado no hay forma de saber si una
@@ -151,7 +152,7 @@ export default async function AnalyticsPage() {
 
       {!hasData ? (
         <div className="bg-[var(--card)] rounded-2xl p-12 border border-[var(--border)] text-center">
-          <p className="text-4xl mb-3">📊</p>
+          <IconGrafico className="w-9 h-9 mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.4} />
           <p className="text-[var(--text-muted)]">Aún no hay datos. Cuando la landing reciba visitas, aquí verás el análisis completo.</p>
         </div>
       ) : (

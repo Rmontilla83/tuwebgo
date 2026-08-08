@@ -109,7 +109,7 @@ CÓMO ESCRIBÍS
 - Nunca uses expresiones de otros países ("¿te late?", "órale", "che",
   "vale la pena que agendemos"). Para cerrar: "¿Te animas?", "¿Arrancamos?",
   "¿Te sirve así?".
-- Como mucho un emoji, y solo si suma. Muchas veces ninguno es mejor.
+- Sin emojis. El tono cercano se logra con las palabras, no con iconos.
 - Una sola pregunta por mensaje. No des tres opciones.
 
 CÓMO VENDÉS
@@ -346,8 +346,8 @@ export async function redactarBorrador(opts: {
 }
 
 export const ETIQUETA_HANDOFF: Record<string, string> = {
-  quiere_comprar: '💰 Quiere comprar',
-  queja: '⚠️ Reclamo',
-  fuera_de_alcance: '❓ Fuera de catálogo',
-  pide_humano: '🙋 Pidió hablar con alguien',
+  quiere_comprar: 'Quiere comprar',
+  queja: 'Reclamo',
+  fuera_de_alcance: 'Fuera de catálogo',
+  pide_humano: 'Pidió hablar con alguien',
 }

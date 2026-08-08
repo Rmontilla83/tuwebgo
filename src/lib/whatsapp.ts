@@ -147,7 +147,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     stages: ['nuevo'],
     metaCategory: 'UTILITY',
     build: (v) =>
-      `${saludo(v)}! Soy Rafael de TuWebGo 👋\n\n` +
+      `${saludo(v)}! Soy Rafael de TuWebGo\n\n` +
       `Vi que escribiste por ${plan(v)}${v.negocio ? ` para ${v.negocio}` : ''}. ` +
       `¿Te cuento cómo funciona en 2 minutos?\n\n` +
       `Te hago un pre-diseño de tu página por $50. Si no te gusta, te devuelvo el dinero completo, sin preguntas.`,
@@ -168,7 +168,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     stages: ['pre_diseno_enviado'],
     metaCategory: 'UTILITY',
     build: (v) =>
-      `${saludo(v)}! Ya te mandé el pre-diseño ✅\n\n` +
+      `${saludo(v)}! Ya te mandé el pre-diseño\n\n` +
       `Míralo con calma y dime qué te gustaría cambiar: colores, textos, secciones, lo que sea. ` +
       `Ajustamos hasta que quede como lo imaginas.`,
   },
@@ -178,7 +178,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     stages: ['aprobado'],
     metaCategory: 'UTILITY',
     build: (v) =>
-      `${saludo(v)}! Perfecto, entonces arrancamos 🚀\n\n` +
+      `${saludo(v)}! Perfecto, entonces arrancamos\n\n` +
       (v.monto ? `El total es $${v.monto}.\n\n` : '') +
       `Puedes pagar por Zelle, Binance, PayPal, Zinli o pago móvil — el que te quede más cómodo. ` +
       `Apenas confirmes, empiezo de una vez.`,
@@ -189,7 +189,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     stages: ['pagado', 'entregado'],
     metaCategory: 'UTILITY',
     build: (v) =>
-      `${saludo(v)}! Tu página ya está en línea 🎉\n\n` +
+      `${saludo(v)}! Tu página ya está en línea\n\n` +
       `Échale un ojo y dime si quieres ajustar algo. ` +
       `Cualquier cosa que necesites después, aquí estoy.`,
   },
@@ -202,7 +202,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
       `${saludo(v)}! ¿Cómo va${v.negocio ? ` ${v.negocio}` : ''}?\n\n` +
       `Te escribo por si todavía te interesa lo de la página web. ` +
       `Sigo con el pre-diseño de $50 con garantía de devolución.\n\n` +
-      `Si ya no aplica, dime y no te escribo más 🙌`,
+      `Si ya no aplica, dime y no te escribo más`,
   },
   {
     id: 'pedir_datos',

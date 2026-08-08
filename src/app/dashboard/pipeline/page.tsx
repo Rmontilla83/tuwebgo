@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
 import WhatsAppPanel from '@/components/WhatsAppPanel'
 import { normalizePhoneVE, waLink, WA_TEMPLATES } from '@/lib/whatsapp'
+import { ICONO_ACTIVIDAD, IconNota, IconEtapa, IconCarpeta, IconWhatsApp, IconUsuario, IconLista } from '@/components/icons'
 
 type Lead = {
   id: string; name: string | null; phone: string | null; business_name: string | null
@@ -26,7 +27,7 @@ const STAGE_THEME: Record<string, { border: string; dot: string; bg: string; tab
 }
 const PLAN_LABELS: Record<string, string> = { pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' }
 const SOURCE_LABELS: Record<string, string> = { landing_page: 'Landing', instagram_dm: 'Instagram', referral: 'Referido', meta_ads_direct: 'Meta Ads', organic_wa: 'WhatsApp', other: 'Otro' }
-const ACTIVITY_ICONS: Record<string, string> = { note: '📝', call: '📞', message: '💬', email: '📧', task: '✅', stage_change: '🔄', system: '⚙️' }
+const ACTIVITY_LABELS: Record<string, string> = { note: 'Nota', call: 'Llamada', message: 'Mensaje', email: 'Correo', task: 'Tarea', stage_change: 'Cambio de etapa', system: 'Sistema' }
 
 function timeAgo(date: string): string {
   const diff = Date.now() - new Date(date).getTime()
@@ -252,7 +253,7 @@ export default function PipelinePage() {
           quedaba literalmente vacía: título, "0 leads", buscador y nada debajo. */}
       {visibleStages.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-[var(--border)]">
-          <p className="text-4xl mb-3">🗂️</p>
+          <IconCarpeta className="w-9 h-9 mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.4} />
           <p className="text-sm font-semibold text-[var(--dark)]">No se cargaron las etapas del pipeline</p>
           <p className="text-xs text-[var(--text-muted)] mt-1.5 max-w-sm mx-auto">
             La tabla <code className="font-mono">pipeline_stages</code> no devolvió ninguna fila.
@@ -394,7 +395,7 @@ function NewLeadModal({ onClose, onSave }: { onClose: () => void; onSave: (d: Re
   const [form, setForm] = useState({name:'',phone:'',business_name:'',source_channel:'landing_page',plan_interested:'',notes:''})
   const set = (k:string,v:string) => setForm(p=>({...p,[k]:v}))
   return (
-    <Modal title="Nuevo Lead" icon="👤" onClose={onClose}>
+    <Modal title="Nuevo Lead" icon={<IconUsuario className="w-4 h-4" />} onClose={onClose}>
       <div className="space-y-4">
         <Input label="Nombre" value={form.name} onChange={v=>set('name',v)} autoFocus />
         <Input label="Teléfono" value={form.phone} onChange={v=>set('phone',v)} />
@@ -426,7 +427,7 @@ function LinkRefModal({ supabase, onClose, onLinked }: { supabase: ReturnType<ty
     if(lead){await supabase.from('sessions').update({lead_id:lead.id}).eq('id',sessionData.id);setResult('Lead creado y vinculado');setTimeout(onLinked,1200)}
   }
   return (
-    <Modal title="Vincular ref code" icon="🔗" onClose={onClose}>
+    <Modal title="Vincular ref code" icon={<IconWhatsApp className="w-4 h-4" />} onClose={onClose}>
       <p className="text-sm text-[var(--text-secondary)] mb-4">Código <code className="bg-[var(--bg-alt)] px-1.5 py-0.5 rounded text-[var(--primary)] font-mono font-bold text-xs">[ref:TW-xxxx]</code> del WhatsApp</p>
       <div className="flex gap-2 mb-5">
         <input type="text" value={refCode} onChange={e=>setRefCode(e.target.value)} placeholder="TW-a3f2" className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--dark)] text-sm font-mono font-bold tracking-wider placeholder:text-[var(--text-muted)] placeholder:font-normal" autoFocus />
@@ -478,7 +479,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
   const age = getDealAge(lead.created_at)
 
   return (
-    <Modal title={lead.name||'Lead'} icon="📋" onClose={onClose}>
+    <Modal title={lead.name||'Lead'} icon={<IconLista className="w-4 h-4" />} onClose={onClose}>
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-[var(--bg-alt)] p-1 rounded-xl">
         <button onClick={()=>setTab('edit')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='edit'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Datos</button>
@@ -543,7 +544,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
         <div className="space-y-4">
           {/* Quick note */}
           <div className="flex gap-2">
-            <select value={noteType} onChange={e=>setNoteType(e.target.value)} className="px-2 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm w-16">{Object.entries(ACTIVITY_ICONS).filter(([k])=>!['stage_change','system'].includes(k)).map(([v,i])=><option key={v} value={v}>{i}</option>)}</select>
+            <select value={noteType} onChange={e=>setNoteType(e.target.value)} className="px-2 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm w-28">{Object.entries(ACTIVITY_LABELS).filter(([k])=>!['stage_change','system'].includes(k)).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
             <input type="text" value={newNote} onChange={e=>setNewNote(e.target.value)} placeholder="Agregar nota rápida..." onKeyDown={e=>{if(e.key==='Enter')addNote()}}
               className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)]" />
             <button onClick={addNote} disabled={!newNote.trim()} className="px-3 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-semibold disabled:opacity-40 cursor-pointer">+</button>
@@ -559,7 +560,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
             ].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item, i) => (
               <div key={i} className="flex gap-3 py-2 relative">
                 <div className="w-9 h-9 rounded-full bg-white border border-[var(--border-light)] flex items-center justify-center text-sm flex-shrink-0 z-10">
-                  {item.type === 'transition' ? '🔄' : ACTIVITY_ICONS[(item.data as Activity).activity_type] || '📝'}
+                  {(() => { const I = item.type === 'transition' ? IconEtapa : (ICONO_ACTIVIDAD[(item.data as Activity).activity_type] ?? IconNota); return <I className="w-4 h-4 text-[var(--text-muted)]" /> })()}
                 </div>
                 <div className="flex-1 min-w-0">
                   {item.type === 'transition' ? (
@@ -584,7 +585,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
 }
 
 // ── Shared UI ──
-function Modal({title,icon,onClose,children}:{title:string;icon?:string;onClose:()=>void;children:React.ReactNode}) {
+function Modal({title,icon,onClose,children}:{title:string;icon?:React.ReactNode;onClose:()=>void;children:React.ReactNode}) {
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />

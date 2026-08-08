@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
 import { SITIO, WA_BASE } from '@/lib/config'
+import { IconMegafono, IconCheck } from '@/components/icons'
 
 type Campaign = {
   id: string
@@ -149,7 +150,7 @@ export default function CampaignsPage() {
       {/* Campaigns Table */}
       {campaigns.length === 0 ? (
         <div className="bg-[var(--card)] rounded-2xl p-12 border border-[var(--border)] text-center">
-          <p className="text-4xl mb-3">📢</p>
+          <IconMegafono className="w-9 h-9 mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.4} />
           <p className="text-[var(--text-muted)]">No hay campañas. Crea tu primera para trackear gastos y ROI.</p>
         </div>
       ) : (
@@ -427,7 +428,7 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">Link landing</p>
               <button onClick={() => copy(landingUrl, 'landing')} className="px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white text-[10px] font-semibold cursor-pointer active:scale-[0.95]">
-                {copied === 'landing' ? '✓ Copiado' : 'Copiar'}
+                {copied === 'landing' ? <span className="inline-flex items-center gap-1"><IconCheck className="w-3 h-3" />Copiado</span> : 'Copiar'}
               </button>
             </div>
             <code className="block bg-[var(--bg)] rounded-xl px-3 py-2.5 text-[11px] text-[var(--dark)] break-all border border-[var(--border)] leading-relaxed">{landingUrl}</code>
@@ -436,7 +437,7 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">WhatsApp directo</p>
               <button onClick={() => copy(waUrl, 'wa')} className="px-3 py-1.5 rounded-lg bg-[var(--green-wa)] text-white text-[10px] font-semibold cursor-pointer active:scale-[0.95]">
-                {copied === 'wa' ? '✓ Copiado' : 'Copiar'}
+                {copied === 'wa' ? <span className="inline-flex items-center gap-1"><IconCheck className="w-3 h-3" />Copiado</span> : 'Copiar'}
               </button>
             </div>
             <code className="block bg-[var(--bg)] rounded-xl px-3 py-2.5 text-[11px] text-[var(--dark)] break-all border border-[var(--border)] leading-relaxed">{waUrl}</code>

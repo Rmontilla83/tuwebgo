@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { PLANTILLAS, previsualizar, COSTO_APROX } from '@/lib/waTemplates'
+import { IconCheck, IconVolver, IconError } from '@/components/icons'
 
 type EstadoMeta = { name: string; status: string; category?: string; rejected_reason?: string }
 type Resultado = { name: string; estado: string; detalle?: string }
@@ -90,11 +91,12 @@ export default function PlantillasWA() {
       {resultados && (
         <div className="mb-4 px-3 py-2.5 rounded-xl bg-[var(--bg-alt)] border border-[var(--border-light)]">
           {resultados.map((r) => (
-            <p key={r.name} className="text-xs text-[var(--text-secondary)]">
-              <span className="font-mono">{r.name}</span>{' — '}
-              {r.estado === 'enviada' ? '✅ enviada a revisión'
-                : r.estado === 'ya_existia' ? '↩︎ ya existía'
-                : `❌ ${r.detalle}`}
+            <p key={r.name} className="text-xs text-[var(--text-secondary)] flex items-start gap-1.5">
+              {r.estado === 'enviada' ? <IconCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                : r.estado === 'ya_existia' ? <IconVolver className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0 mt-0.5" />
+                : <IconError className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />}
+              <span><span className="font-mono">{r.name}</span>{' — '}
+              {r.estado === 'enviada' ? 'enviada a revisión' : r.estado === 'ya_existia' ? 'ya existía' : r.detalle}</span>
             </p>
           ))}
         </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPhoneVE, templatesForStage, waLink } from '@/lib/whatsapp'
+import { ICONO_HANDOFF, IconChat, IconCerrar, IconAsistente, IconUsuario, IconMano, IconFlecha, IconEnlaceExterno } from '@/components/icons'
 
 export type Conversation = {
   id: string
@@ -34,18 +35,18 @@ type Message = {
 }
 
 const MOTIVO_LEGIBLE: Record<string, string> = {
-  quiere_comprar: '💰 El cliente quiere comprar — te toca cerrar',
-  queja: '⚠️ Reclamo — atendelo vos',
-  fuera_de_alcance: '❓ Pidió algo fuera del catálogo',
-  pide_humano: '🙋 Pidió hablar con una persona',
+  quiere_comprar: 'El cliente quiere comprar — te toca cerrar',
+  queja: 'Reclamo — atendelo vos',
+  fuera_de_alcance: 'Pidió algo fuera del catálogo',
+  pide_humano: 'Pidió hablar con una persona',
 }
 
 /** Versión corta para la lista, donde el espacio es poco. */
 const ETIQUETA_CORTA: Record<string, string> = {
-  quiere_comprar: '💰 Quiere comprar',
-  queja: '⚠️ Reclamo',
-  fuera_de_alcance: '❓ Fuera de catálogo',
-  pide_humano: '🙋 Pidió una persona',
+  quiere_comprar: 'Quiere comprar',
+  queja: 'Reclamo',
+  fuera_de_alcance: 'Fuera de catálogo',
+  pide_humano: 'Pidió una persona',
 }
 
 function horaCorta(iso: string) {
@@ -373,7 +374,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
             <p className="text-sm font-semibold text-red-700">Error</p>
             <p className="text-xs text-red-600 mt-0.5 break-words font-mono">{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 cursor-pointer flex-shrink-0" aria-label="Cerrar">✕</button>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 cursor-pointer flex-shrink-0" aria-label="Cerrar"><IconCerrar className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -407,14 +408,14 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
               >
                 {soloPendientes
                   ? `Viendo solo las ${pendientesHumano} que te esperan · Ver todas`
-                  : `👤 ${pendientesHumano} ${pendientesHumano === 1 ? 'conversación te espera' : 'conversaciones te esperan'}`}
+                  : `${pendientesHumano} ${pendientesHumano === 1 ? 'conversación te espera' : 'conversaciones te esperan'}`}
               </button>
             )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {filtradas.length === 0 ? (
               <div className="text-center py-14 px-4">
-                <p className="text-3xl mb-3">💬</p>
+                <IconChat className="w-9 h-9 mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.4} />
                 <p className="text-sm font-semibold text-[var(--dark)]">{busqueda ? 'Sin resultados' : 'Todavía no hay conversaciones'}</p>
                 {!busqueda && <p className="text-xs text-[var(--text-muted)] mt-1.5">Escribile a un lead desde Pipeline y la conversación aparece acá.</p>}
               </div>
@@ -446,7 +447,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                 {/* Sofía se apartó: acá hay algo que solo vos podés resolver */}
                 {!c.bot_activo && c.handoff_motivo && (
                   <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-semibold border border-amber-300">
-                    {ETIQUETA_CORTA[c.handoff_motivo] ?? '👤 Te toca a vos'}
+                    {(() => { const I = ICONO_HANDOFF[c.handoff_motivo!] ?? IconMano; return <><I className="w-3 h-3" />{ETIQUETA_CORTA[c.handoff_motivo!] ?? 'Te toca a vos'}</> })()}
                   </span>
                 )}
               </button>
@@ -463,7 +464,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
           ) : (
             <>
               <div className="px-4 py-3 border-b border-[var(--border-light)] flex items-center gap-3">
-                <button onClick={() => setActiva(null)} className="lg:hidden text-[var(--text-muted)] cursor-pointer text-lg" aria-label="Volver">←</button>
+                <button onClick={() => setActiva(null)} className="lg:hidden text-[var(--text-muted)] cursor-pointer text-lg" aria-label="Volver"><IconFlecha className="w-5 h-5 rotate-180" /></button>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-sm text-[var(--dark)] truncate">
                     {conv.leads?.name || conv.display_name || formatPhoneVE(conv.phone_e164)}
@@ -482,7 +483,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                       : 'bg-[var(--bg-alt)] text-[var(--text-muted)] border-[var(--border)]'
                   }`}
                 >
-                  {conv.bot_activo ? '✨ Sofía' : '👤 Vos'}
+                  <span className="inline-flex items-center gap-1">{conv.bot_activo ? <IconAsistente className="w-3.5 h-3.5" /> : <IconUsuario className="w-3.5 h-3.5" />}{conv.bot_activo ? 'Sofía' : 'Vos'}</span>
                 </button>
               </div>
 
@@ -513,12 +514,12 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                           : 'bg-emerald-500 text-white rounded-br-md'        // Rafael: verde
                     }`}>
                       {m.direction === 'out' && m.por_bot && (
-                        <p className="text-[9px] font-semibold text-white/70 mb-0.5">✨ Sofía</p>
+                        <p className="text-[9px] font-semibold text-white/70 mb-0.5 inline-flex items-center gap-1"><IconAsistente className="w-3 h-3" />Sofía</p>
                       )}
                       <p className="text-sm whitespace-pre-wrap break-words">{m.body || `[${m.msg_type}]`}</p>
                       <div className={`flex items-center gap-1.5 mt-1 ${m.direction === 'out' ? 'text-white/60' : 'text-[var(--text-muted)]'}`}>
                         <span className="text-[10px]">{horaCorta(m.created_at)}</span>
-                        {m.channel === 'deeplink' && <span className="text-[9px]" title="Enviado abriendo WhatsApp">↗</span>}
+                        {m.channel === 'deeplink' && <IconEnlaceExterno className="w-2.5 h-2.5" />}
                         {m.status === 'failed' && <span className="text-[9px] text-red-200">falló</span>}
                       </div>
                     </div>
@@ -538,7 +539,7 @@ export default function InboxClient({ initial }: { initial: Conversation[] }) {
                     {redactando ? (
                       <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />Redactando…</>
                     ) : (
-                      <>✨ Sugerir{borrador.trim() && ' con mi indicación'}</>
+                      <><IconAsistente className="w-3 h-3" />Sugerir{borrador.trim() && ' con mi indicación'}</>
                     )}
                   </button>
                   <span className="flex-shrink-0 w-px h-4 bg-[var(--border)]" />
