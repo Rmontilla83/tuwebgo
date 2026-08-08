@@ -63,7 +63,7 @@ export default function SettingsPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Configuración</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Configuración</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">Cuenta, asistente y plantillas de WhatsApp</p>
       </div>
 
@@ -74,22 +74,22 @@ export default function SettingsPage() {
         <div className="bg-white rounded-2xl p-6 border border-[var(--border)] shadow-sm max-w-md">
           <div className="flex items-center gap-2 mb-5">
             <div className="w-1 h-5 rounded-full gradient-bar"></div>
-            <h2 className="text-sm font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] uppercase tracking-wider">Cambiar contraseña</h2>
+            <h2 className="text-sm font-bold text-[var(--dark)] font-[family-name:var(--font-display)] uppercase tracking-wider">Cambiar contraseña</h2>
           </div>
 
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">Contraseña actual</label>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">Contraseña actual</label>
               <input type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} required
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all duration-200" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">Nueva contraseña</label>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">Nueva contraseña</label>
               <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={6}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all duration-200" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">Confirmar nueva contraseña</label>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">Confirmar nueva contraseña</label>
               <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all duration-200" />
             </div>
@@ -101,7 +101,7 @@ export default function SettingsPage() {
             )}
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-50">
+              className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-50">
               {loading ? 'Actualizando...' : 'Actualizar contraseña'}
             </button>
           </form>

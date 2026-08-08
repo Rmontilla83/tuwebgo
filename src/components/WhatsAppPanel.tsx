@@ -66,17 +66,14 @@ export default function WhatsAppPanel({
       p_phone: lead.phone, p_body: texto, p_lead_id: lead.id, p_template: template?.id ?? null,
     })
     if (err) setError(`Se abrió WhatsApp pero no quedó registrado: ${err.message}`)
-    else registrarActividad(texto, 'Abrió WhatsApp')
     onLogged?.()
   }
 
-  async function registrarActividad(texto: string, como: string) {
-    await supabase.from('lead_activities').insert({
-      lead_id: lead.id,
-      activity_type: 'message',
-      content: `${como} · ${template?.label ?? 'mensaje'}: ${texto.replace(/\s+/g, ' ').slice(0, 180)}`,
-    })
-  }
+  // registrarActividad eliminado: escribía una copia degradada del mensaje en
+  // lead_activities mientras el texto completo ya quedaba en wa_messages. Eran
+  // dos historiales contradictorios — 101 mensajes reales contra 3 actividades.
+  // wa_messages es la fuente única; lead_activities queda para notas, llamadas
+  // y tareas, que no viven en ningún otro lado.
 
   async function enviar() {
     if (!message.trim() || enviando) return
@@ -94,7 +91,6 @@ export default function WhatsAppPanel({
       if (res.ok) {
         setResultado('api')
         if (data.aviso) setError(data.aviso)
-        await registrarActividad(texto, 'Enviado por WhatsApp')
         onLogged?.()
         return
       }
@@ -118,7 +114,7 @@ export default function WhatsAppPanel({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-emerald-700">
           <IconWhatsApp className="w-4 h-4" />
-          <p className="text-[10px] font-bold uppercase tracking-wider font-[Space_Grotesk,sans-serif]">WhatsApp</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider font-[family-name:var(--font-display)]">WhatsApp</p>
         </div>
         <span className={`text-[10px] font-mono ${phoneOk ? 'text-emerald-600' : 'text-red-500'}`}>
           {phoneOk ? formatPhoneVE(lead.phone) : 'sin teléfono válido'}
@@ -151,7 +147,7 @@ export default function WhatsAppPanel({
       <button
         onClick={enviar}
         disabled={!phoneOk || enviando}
-        className="w-full mt-3 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
+        className="w-full mt-3 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:brightness-110 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
       >
         {enviando ? 'Enviando…' : 'Enviar mensaje'}
       </button>

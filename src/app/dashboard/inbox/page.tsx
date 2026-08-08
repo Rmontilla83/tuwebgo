@@ -15,7 +15,10 @@ export default async function InboxPage() {
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .range(0, PAGE - 1)
 
-  const etapasRes = await supabase.from('pipeline_stages').select('slug, label, sort_order').order('sort_order')
+  // Sin is_lost: 'Perdido' no puede estar al lado de las demás como si fuera un
+  // paso más. Marcarlo por error saca el lead del Pipeline sin vuelta atrás.
+  const etapasRes = await supabase.from('pipeline_stages')
+    .select('slug, label, sort_order').eq('is_lost', false).order('sort_order')
 
   assertNoError({ conversaciones: res, etapas: etapasRes })
 

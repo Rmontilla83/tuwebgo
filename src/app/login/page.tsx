@@ -63,12 +63,12 @@ export default function LoginPage() {
               <path d="M124.2 14.5 L125.5 12 L125 13.8 L127.2 12.8" stroke="#fff" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <p className="text-white/30 text-xs font-[Space_Grotesk,sans-serif] font-semibold uppercase tracking-[0.2em]">Portal de control</p>
+          <p className="text-white/30 text-xs font-[family-name:var(--font-display)] font-semibold uppercase tracking-[0.2em]">Portal de control</p>
         </div>
 
         <form onSubmit={handleLogin} className="bg-white/[0.04] glass border border-white/[0.08] rounded-2xl p-8 shadow-2xl">
           <div className="mb-5">
-            <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2 font-[Space_Grotesk,sans-serif]">Email</label>
+            <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2 font-[family-name:var(--font-display)]">Email</label>
             <input
               type="email"
               value={email}
@@ -79,7 +79,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="mb-7">
-            <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2 font-[Space_Grotesk,sans-serif]">Contraseña</label>
+            <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2 font-[family-name:var(--font-display)]">Contraseña</label>
             <input
               type="password"
               value={password}
@@ -99,14 +99,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all duration-300 disabled:opacity-50 cursor-pointer relative overflow-hidden group"
+            className="w-full py-3 px-4 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all duration-300 disabled:opacity-50 cursor-pointer relative overflow-hidden group"
           >
             <span className="relative z-10">{loading ? 'Entrando...' : 'Entrar al portal'}</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700"></div>
           </button>
         </form>
 
-        <p className="text-center text-[10px] text-white/15 mt-8 font-[Space_Grotesk,sans-serif] tracking-wider">
+        <p className="text-center text-[10px] text-white/15 mt-8 font-[family-name:var(--font-display)] tracking-wider">
           TUWEBGO.NET &mdash; SISTEMA INTERNO
         </p>
       </div>

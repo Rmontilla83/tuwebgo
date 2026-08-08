@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatPhoneVE, templatesForStage, waLink } from '@/lib/whatsapp'
 import { PLANTILLAS, previsualizar, type PlantillaWA } from '@/lib/waTemplates'
@@ -97,6 +99,23 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
   useEffect(() => { activaRef.current = activa }, [activa])
 
   const conv = convs.find((c) => c.id === activa) ?? null
+
+  // Una conversación ahora tiene URL: ?conv=<id> o ?tel=<e164>. Sin esto no se
+  // podía enlazar desde el Dashboard ni desde una tarjeta del Pipeline, y no
+  // había forma de mandarle a alguien "mirá esta conversación".
+  const params = useSearchParams()
+  useEffect(() => {
+    if (activa) return
+    const porId = params.get('conv')
+    const porTel = params.get('tel')
+    const objetivo = porId
+      ? convs.find((c) => c.id === porId)
+      : porTel ? convs.find((c) => c.phone_e164 === porTel) : null
+    if (objetivo) abrir(objetivo.id)
+    // abrir() no va en deps a propósito: se recrea en cada render y dispararía
+    // un bucle. Solo interesa correr esto cuando cambian la URL o la lista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, convs, activa])
 
   const recargarConvs = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -385,7 +404,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
     <div className="animate-fade-in">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Inbox</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Inbox</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
             {convs.length} conversaciones
             {sinLeer > 0 && <span className="text-emerald-600 font-semibold"> · {sinLeer} sin leer</span>}
@@ -503,7 +522,16 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                   <p className="font-semibold text-sm text-[var(--dark)] truncate">
                     {conv.leads?.name || conv.display_name || formatPhoneVE(conv.phone_e164)}
                   </p>
-                  <p className="text-[11px] text-[var(--text-muted)] font-mono">{formatPhoneVE(conv.phone_e164)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[11px] text-[var(--text-muted)] font-mono">{formatPhoneVE(conv.phone_e164)}</p>
+                    {/* Inbox y Pipeline eran dos islas sin ida ni vuelta */}
+                    {conv.lead_id && (
+                      <Link href={`/dashboard/pipeline?lead=${conv.lead_id}`}
+                        className="text-[11px] text-[var(--primary)] hover:underline flex-shrink-0">
+                        Ver ficha
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 <span className={`hidden sm:inline text-[10px] px-2 py-1 rounded-lg font-semibold flex-shrink-0 ${v.abierta ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-[var(--bg-alt)] text-[var(--text-muted)] border border-[var(--border-light)]'}`}>
                   {v.texto}
@@ -649,7 +677,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                     onClick={enviar}
                     disabled={!borrador.trim() || enviando}
                     title={v.abierta ? 'Se envía por la API de WhatsApp' : 'Ventana cerrada: se abre WhatsApp para que lo mandes vos'}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] whitespace-nowrap"
+                    className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] whitespace-nowrap"
                   >
                     {enviando ? 'Enviando…' : v.abierta ? 'Enviar' : 'Abrir WA'}
                   </button>

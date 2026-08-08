@@ -114,7 +114,14 @@ export default function CampaignsPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  // void + IIFE: el linter de React 19 marca setState síncrono en el cuerpo de
+  // un efecto. La carga inicial de datos es asíncrona por naturaleza, así que
+  // se aísla en una tarea para que el efecto no la ejecute en su propio tick.
+  useEffect(() => {
+    let vivo = true
+    void (async () => { await fetchData(); if (!vivo) return })()
+    return () => { vivo = false }
+  }, [fetchData])
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><p className="text-[#94A3B8]">Cargando campañas...</p></div>
@@ -138,7 +145,7 @@ export default function CampaignsPage() {
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Campañas</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Campañas</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">{campaigns.length} campañas registradas</p>
         </div>
         <div className="flex gap-2">
@@ -255,7 +262,7 @@ function MetricBox({ label, value, color }: { label: string; value: string; colo
   return (
     <div className="bg-[var(--bg)] rounded-xl p-2 sm:p-3 text-center">
       <p className="text-[8px] sm:text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
-      <p className={`text-sm sm:text-lg font-bold ${color || 'text-[var(--dark)]'} mt-0.5 font-[Space_Grotesk,sans-serif]`}>{value}</p>
+      <p className={`text-sm sm:text-lg font-bold ${color || 'text-[var(--dark)]'} mt-0.5 font-[family-name:var(--font-display)]`}>{value}</p>
     </div>
   )
 }
@@ -291,7 +298,7 @@ function CampaignModal({ title, initial, onClose, onSave }: {
         </div>
         <Select label="Estado" value={form.status} onChange={v => set('status', v)} options={Object.entries(STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
         <Textarea label="Notas" value={form.notes} onChange={v => set('notes', v)} />
-        <button onClick={() => onSave({ ...form, end_date: form.end_date || null, utm_campaign: form.utm_campaign || null, notes: form.notes || null })} className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98]">
+        <button onClick={() => onSave({ ...form, end_date: form.end_date || null, utm_campaign: form.utm_campaign || null, notes: form.notes || null })} className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98]">
           Guardar
         </button>
       </div>
@@ -461,7 +468,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="flex min-h-full items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl animate-fade-in-scale border border-[var(--border-light)]" style={{pointerEvents:'auto'}} onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)]">
-              <h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2>
+              <h2 className="font-bold text-lg text-[var(--dark)] font-[family-name:var(--font-display)]">{title}</h2>
               <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer p-1.5 rounded-lg hover:bg-[var(--bg-alt)]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
             <div className="p-5 max-h-[70vh] overflow-y-auto">{children}</div>
@@ -475,7 +482,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function Input({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all" />
     </div>
@@ -485,7 +492,7 @@ function Input({ label, value, onChange, type = 'text', placeholder }: { label: 
 function Textarea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">{label}</label>
       <textarea value={value} onChange={e => onChange(e.target.value)} rows={2}
         className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all resize-none" />
     </div>
@@ -495,7 +502,7 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label>
+      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)}
         className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

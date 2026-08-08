@@ -20,6 +20,7 @@ const PLAN_LABELS: Record<string, string> = {
   pre_diseno: 'Pre-diseño',
   landing_page: 'Landing Page',
   sitio_web: 'Sitio Web',
+  sin_plan: 'Sin plan definido',
 }
 
 async function getAnalytics() {
@@ -28,7 +29,10 @@ async function getAnalytics() {
   const [sessionsRes, eventsRes, leadsRes, ctaRes, stagesRes] = await Promise.all([
     supabase.from('sessions').select('device_type, utm_source, utm_medium, utm_campaign, referrer, first_seen_at', { count: 'exact' }).limit(MAX_ROWS),
     supabase.from('events').select('event_type, event_data, session_id').eq('event_type', 'section_visible').limit(MAX_ROWS),
-    supabase.from('leads').select('source_channel, plan_interested, plan_final, current_stage, amount_paid, campaign_id', { count: 'exact' }).limit(MAX_ROWS),
+    // Sin los 613 importados del Excel ni los leads de prueba: mezclados, los
+    // porcentajes de conversión y la atribución por canal son ficción.
+    supabase.from('leads').select('source_channel, plan_interested, plan_final, current_stage, amount_paid, campaign_id', { count: 'exact' })
+      .eq('es_prueba', false).neq('source_channel', 'other').limit(MAX_ROWS),
     supabase.from('events').select('event_data', { count: 'exact' }).eq('event_type', 'cta_click').limit(MAX_ROWS),
     supabase.from('pipeline_stages').select('slug, is_won'),
   ])
@@ -71,7 +75,7 @@ async function getAnalytics() {
   // Plan popularity
   const plans: Record<string, number> = {}
   for (const lead of leads || []) {
-    const p = lead.plan_interested || 'undefined'
+    const p = lead.plan_interested || 'sin_plan'
     plans[p] = (plans[p] || 0) + 1
   }
 
@@ -151,8 +155,14 @@ export default async function AnalyticsPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Analytics</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Tráfico, atribución y conversión</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Analytics</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Tráfico, atribución y conversión · <span className="font-semibold">todo el histórico</span> desde abril 2026
+        </p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          Excluye los {" "}<span className="font-mono">613</span> contactos importados del Excel y los leads de prueba.
+          El Dashboard, en cambio, muestra solo el mes en curso.
+        </p>
       </div>
 
       {!hasData ? (
@@ -166,22 +176,22 @@ export default async function AnalyticsPage() {
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <div className="bg-[var(--card)] rounded-2xl p-3 sm:p-5 border border-[var(--border)] shadow-sm text-center">
               <p className="text-[9px] sm:text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Sesiones</p>
-              <p className="text-xl sm:text-3xl font-bold text-[var(--dark)] mt-0.5 sm:mt-1 font-[Space_Grotesk,sans-serif]">{a.totalSessions}</p>
+              <p className="text-xl sm:text-3xl font-bold text-[var(--dark)] mt-0.5 sm:mt-1 font-[family-name:var(--font-display)]">{a.totalSessions}</p>
             </div>
             <div className="bg-[var(--card)] rounded-2xl p-3 sm:p-5 border border-[var(--border)] shadow-sm text-center">
               <p className="text-[9px] sm:text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Clics CTA</p>
-              <p className="text-xl sm:text-3xl font-bold text-[var(--primary)] mt-0.5 sm:mt-1 font-[Space_Grotesk,sans-serif]">{a.totalCtaClicks}</p>
+              <p className="text-xl sm:text-3xl font-bold text-[var(--primary)] mt-0.5 sm:mt-1 font-[family-name:var(--font-display)]">{a.totalCtaClicks}</p>
             </div>
             <div className="bg-[var(--card)] rounded-2xl p-3 sm:p-5 border border-[var(--border)] shadow-sm text-center">
               <p className="text-[9px] sm:text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Leads</p>
-              <p className="text-xl sm:text-3xl font-bold text-[var(--green)] mt-0.5 sm:mt-1 font-[Space_Grotesk,sans-serif]">{a.totalLeads}</p>
+              <p className="text-xl sm:text-3xl font-bold text-[var(--green)] mt-0.5 sm:mt-1 font-[family-name:var(--font-display)]">{a.totalLeads}</p>
             </div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Channel Attribution — card-based on mobile */}
             <div className="bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm">
-              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[Space_Grotesk,sans-serif]">Atribución por canal</h2>
+              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[family-name:var(--font-display)]">Atribución por canal</h2>
               {sortedChannels.length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">Sin datos de canales</p>
               ) : (
@@ -203,7 +213,7 @@ export default async function AnalyticsPage() {
 
             {/* Device breakdown */}
             <div className="bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm">
-              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[Space_Grotesk,sans-serif]">Dispositivos</h2>
+              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[family-name:var(--font-display)]">Dispositivos</h2>
               <div className="space-y-3">
                 {Object.entries(a.devices).sort((x, y) => y[1] - x[1]).map(([device, count]) => {
                   const pct = ((count / a.totalSessions) * 100).toFixed(0)
@@ -224,7 +234,7 @@ export default async function AnalyticsPage() {
 
             {/* CTA Heatmap */}
             <div className="bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm">
-              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-1 font-[Space_Grotesk,sans-serif]">Heatmap de CTAs</h2>
+              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-1 font-[family-name:var(--font-display)]">Heatmap de CTAs</h2>
               <p className="text-xs text-[var(--text-muted)] mb-3">Qué botón de WhatsApp se presiona más</p>
               {sortedCta.length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">Sin clics aún</p>
@@ -253,7 +263,7 @@ export default async function AnalyticsPage() {
 
             {/* Section Engagement */}
             <div className="bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm">
-              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-1 font-[Space_Grotesk,sans-serif]">Secciones más vistas</h2>
+              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-1 font-[family-name:var(--font-display)]">Secciones más vistas</h2>
               <p className="text-xs text-[var(--text-muted)] mb-3">Qué secciones de la landing ven los visitantes</p>
               {sortedSections.length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">Sin datos aún</p>
@@ -282,7 +292,7 @@ export default async function AnalyticsPage() {
 
             {/* Plan Popularity */}
             <div className="bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm">
-              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[Space_Grotesk,sans-serif]">Planes más solicitados</h2>
+              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[family-name:var(--font-display)]">Planes más solicitados</h2>
               <div className="space-y-3">
                 {Object.entries(a.plans).sort((x, y) => y[1] - x[1]).map(([plan, count]) => (
                   <div key={plan} className="flex items-center justify-between">
@@ -295,7 +305,7 @@ export default async function AnalyticsPage() {
 
             {/* UTM Sources */}
             <div className="bg-[var(--card)] rounded-2xl p-4 sm:p-6 border border-[var(--border)] shadow-sm">
-              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[Space_Grotesk,sans-serif]">Fuentes UTM</h2>
+              <h2 className="text-sm font-bold text-[var(--dark)] uppercase tracking-wider mb-4 font-[family-name:var(--font-display)]">Fuentes UTM</h2>
               {Object.keys(a.utmSources).length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">Sin tráfico UTM aún. Usa el generador en Campañas.</p>
               ) : (

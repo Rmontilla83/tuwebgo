@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <circle cx="126" cy="14" r="5" fill="#EA580C"/>
             <path d="M124.2 14.5 L125.5 12 L125 13.8 L127.2 12.8" stroke="#fff" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <p className="text-[9px] text-white/25 font-[Space_Grotesk,sans-serif] font-semibold uppercase tracking-[0.15em] mt-1.5 ml-0.5">Portal de control</p>
+          <p className="text-[9px] text-white/25 font-[family-name:var(--font-display)] font-semibold uppercase tracking-[0.15em] mt-1.5 ml-0.5">Portal de control</p>
         </div>
 
         {/* Divider */}
@@ -86,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold font-[Space_Grotesk,sans-serif] transition-all duration-300 relative ${
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold font-[family-name:var(--font-display)] transition-all duration-300 relative ${
                   active
                     ? 'bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/25'
                     : 'text-white/45 hover:text-white/90 hover:bg-white/[0.05]'
@@ -112,7 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="mx-1 mb-3 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[Space_Grotesk,sans-serif] text-white/30 hover:text-white/70 hover:bg-white/[0.04] transition-all duration-300 w-full cursor-pointer"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[family-name:var(--font-display)] text-white/30 hover:text-white/70 hover:bg-white/[0.04] transition-all duration-300 w-full cursor-pointer"
           >
             <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -123,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* ── Mobile header (simplified - just logo + page context) ── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--dark)]/95 glass border-b border-white/[0.06] px-4 h-12 flex items-center justify-center safe-top">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--dark)]/95 glass border-b border-white/[0.06] px-4 min-h-12 flex items-center justify-center safe-top">
         {/* Config y Salir viven acá porque el bottom bar ya tiene sus 5 pestañas */}
         <div className="absolute right-3 flex items-center gap-1">
           <Link
@@ -180,7 +180,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Badge n={alertaInbox} urgente={alertaUrgente} className="absolute -top-1.5 -right-2.5 ring-2 ring-[var(--dark)]" />
                   )}
                 </div>
-                <span className={`text-[10px] font-[Space_Grotesk,sans-serif] leading-none ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+                <span className={`text-[10px] font-[family-name:var(--font-display)] leading-none ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
               </Link>
             )
           })}
@@ -188,7 +188,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </nav>
 
       {/* ── Main content ── */}
-      <main className="flex-1 lg:ml-[240px] pt-12 lg:pt-0 pb-16 lg:pb-0 min-h-screen">
+      {/* El padding suma el inset: con h-12 fijo + safe-top el contenido quedaba
+          debajo de la cabecera en iPhone con notch, y bajo la barra de pestañas. */}
+      <main className="flex-1 lg:ml-[240px] pt-[calc(3rem+env(safe-area-inset-top))] lg:pt-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 min-h-screen">
         <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           {children}
         </div>

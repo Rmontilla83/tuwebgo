@@ -22,7 +22,7 @@ export default function DashboardError({
           </svg>
         </div>
 
-        <h2 className="text-lg font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] mb-2">
+        <h2 className="text-lg font-bold text-[var(--dark)] font-[family-name:var(--font-display)] mb-2">
           Algo falló al cargar esta sección
         </h2>
         <p className="text-sm text-[var(--text-secondary)] mb-5">
@@ -31,7 +31,7 @@ export default function DashboardError({
         </p>
 
         <div className="bg-[var(--bg-alt)] rounded-xl p-3 mb-5 text-left">
-          <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1 font-[Space_Grotesk,sans-serif]">
+          <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-display)]">
             Detalle técnico
           </p>
           <p className="text-xs text-[var(--text-secondary)] font-mono break-words">
@@ -47,13 +47,13 @@ export default function DashboardError({
         <div className="flex gap-2">
           <button
             onClick={() => unstable_retry()}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all duration-300 cursor-pointer"
+            className="flex-1 py-2.5 px-4 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all duration-300 cursor-pointer"
           >
             Reintentar
           </button>
           <a
             href="/login"
-            className="py-2.5 px-4 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--bg-alt)] transition-all duration-300"
+            className="py-2.5 px-4 rounded-xl border border-[var(--border)] text-[var(--text-secondary)] font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--bg-alt)] transition-all duration-300"
           >
             Volver a entrar
           </a>

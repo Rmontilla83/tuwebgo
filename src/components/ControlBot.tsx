@@ -40,7 +40,7 @@ export default function ControlBot() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-5 rounded-full gradient-bar" />
-            <h2 className="text-sm font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] uppercase tracking-wider">
+            <h2 className="text-sm font-bold text-[var(--dark)] font-[family-name:var(--font-display)] uppercase tracking-wider">
               Asistente {NOMBRE_BOT}
             </h2>
           </div>

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 :root {
+  /* Las fuentes se consumen por variable y no repitiendo el literal en cada
+     clase: 77 usos de font-[Space_Grotesk,sans-serif] repartidos por la app
+     eran 77 lugares donde cambiar la tipografía. */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+
   --primary: #4F46E5;
   --primary-light: #6366F1;
   --primary-dark: #3730A3;
@@ -39,7 +45,7 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
 }
 
 /* ── Scrollbar ── */

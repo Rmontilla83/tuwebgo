@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { firstError } from '@/lib/supabase/errors'
 import WhatsAppPanel from '@/components/WhatsAppPanel'
-import { normalizePhoneVE, waLink, WA_TEMPLATES } from '@/lib/whatsapp'
+import { normalizePhoneVE } from '@/lib/whatsapp'
 import { ICONO_ACTIVIDAD, IconNota, IconEtapa, IconCarpeta, IconWhatsApp, IconUsuario, IconLista } from '@/components/icons'
 
 type Lead = {
@@ -74,7 +76,6 @@ export default function PipelinePage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewLead, setShowNewLead] = useState(false)
-  const [showLinkRef, setShowLinkRef] = useState(false)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [draggedLead, setDraggedLead] = useState<string | null>(null)
@@ -107,6 +108,17 @@ export default function PipelinePage() {
   }, [supabase])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // ?lead=<id> abre la ficha directo. Es lo que usa el enlace "Ver ficha" del
+  // Inbox: antes las dos pantallas eran islas sin ida ni vuelta.
+  const params = useSearchParams()
+  useEffect(() => {
+    const id = params.get('lead')
+    if (!id || editLead) return
+    const l = leads.find((x) => x.id === id)
+    if (l) setEditLead(l)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, leads])
 
   const filteredLeads = useMemo(() => {
     return leads.filter(l => {
@@ -196,7 +208,7 @@ export default function PipelinePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] tracking-tight">Pipeline</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Pipeline</h1>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             <p className="text-sm text-[var(--text-secondary)]">{filteredLeads.length}{hasActiveFilters ? ` de ${leads.length}` : ''} leads</p>
             {forecast.unweighted > 0 && (
@@ -213,10 +225,7 @@ export default function PipelinePage() {
           <button onClick={exportCsv} title="Exportar CSV" className="px-3 py-2 sm:py-2.5 rounded-xl border border-[var(--border)] text-xs sm:text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           </button>
-          <button onClick={() => setShowLinkRef(true)} className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[var(--green)] text-white text-xs sm:text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:brightness-110 transition-all cursor-pointer shadow-md shadow-emerald-500/20 active:scale-[0.97]">
-            <span className="flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg><span className="hidden sm:inline">Vincular</span> ref</span>
-          </button>
-          <button onClick={() => setShowNewLead(true)} className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[var(--primary)] text-white text-xs sm:text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.97]">+ Lead</button>
+          <button onClick={() => setShowNewLead(true)} className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[var(--primary)] text-white text-xs sm:text-sm font-semibold font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.97]">+ Lead</button>
         </div>
       </div>
 
@@ -266,7 +275,7 @@ export default function PipelinePage() {
             La tabla <code className="font-mono">pipeline_stages</code> no devolvió ninguna fila.
             Suele ser un permiso de RLS o que la sesión expiró.
           </p>
-          <button onClick={() => { setLoading(true); fetchData() }} className="mt-5 px-5 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer">
+          <button onClick={() => { setLoading(true); fetchData() }} className="mt-5 px-5 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all cursor-pointer">
             Reintentar
           </button>
         </div>
@@ -278,13 +287,13 @@ export default function PipelinePage() {
           {visibleStages.map(stage => {
             const count = filteredLeads.filter(l => l.current_stage === stage.slug).length
             const theme = STAGE_THEME[stage.slug]; const active = mobileTab === stage.slug
-            return <button key={stage.slug} onClick={() => setMobileTab(stage.slug)} className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${active ? theme?.tabActive||'bg-[var(--primary)] text-white':'bg-white text-[var(--text-secondary)] border border-[var(--border)]'}`}>
+            return <button key={stage.slug} onClick={() => setMobileTab(stage.slug)} className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${active ? theme?.tabActive||'bg-[var(--primary)] text-white':'bg-white text-[var(--text-secondary)] border border-[var(--border)]'}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${active?'bg-white/70':theme?.dot||'bg-gray-400'}`}></span>{stage.label}<span className={`ml-0.5 px-1.5 rounded-full text-[10px] ${active?'bg-white/20':'bg-[var(--bg-alt)]'}`}>{count}</span>
             </button>
           })}
         </div>
         <div className="space-y-2.5 mt-1">
-          {filteredLeads.filter(l => l.current_stage === mobileTab).map(lead => <LeadCard key={lead.id} lead={lead} stages={stages} onClick={() => setEditLead(lead)} />)}
+          {filteredLeads.filter(l => l.current_stage === mobileTab).map(lead => <LeadCard key={lead.id} lead={lead} onClick={() => setEditLead(lead)} />)}
           {filteredLeads.filter(l => l.current_stage === mobileTab).length === 0 && <div className="text-center py-12 bg-white rounded-2xl border border-[var(--border)]"><p className="text-sm text-[var(--text-muted)]">{hasActiveFilters ? 'Sin resultados' : 'Sin leads'}</p></div>}
         </div>
       </div>
@@ -304,7 +313,7 @@ export default function PipelinePage() {
                 onDragOver={e=>{e.preventDefault();setDragOver(stage.slug)}} onDragLeave={()=>setDragOver(null)} onDrop={()=>{if(draggedLead){moveToStage(draggedLead,stage.slug);setDraggedLead(null);setDragOver(null)}}}>
                 <div className={`p-3 lg:p-4 border-t-[3px] rounded-t-2xl ${theme.border}`}>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0"><span className={`w-2 h-2 rounded-full flex-shrink-0 ${theme.dot}`}></span><h3 className="font-bold text-[12px] lg:text-[13px] text-[var(--dark)] font-[Space_Grotesk,sans-serif] truncate">{stage.label}</h3></div>
+                    <div className="flex items-center gap-2 min-w-0"><span className={`w-2 h-2 rounded-full flex-shrink-0 ${theme.dot}`}></span><h3 className="font-bold text-[12px] lg:text-[13px] text-[var(--dark)] font-[family-name:var(--font-display)] truncate">{stage.label}</h3></div>
                     <span className="text-[10px] lg:text-[11px] font-bold text-[var(--text-muted)] bg-white/80 px-1.5 lg:px-2 py-0.5 rounded-full border border-[var(--border-light)] flex-shrink-0 ml-1">{stageLeads.length}</span>
                   </div>
                 </div>
@@ -345,7 +354,6 @@ export default function PipelinePage() {
         if (error) { setActionError(`No se pudo crear el lead: ${error.message}`); return }
         fetchData()
       }} />}
-      {showLinkRef && <LinkRefModal supabase={supabase} onClose={()=>setShowLinkRef(false)} onLinked={()=>{setShowLinkRef(false);fetchData()}} />}
       {editLead && <EditLeadModal lead={editLead} stages={stages} supabase={supabase} onClose={()=>setEditLead(null)} onSave={async d=>{
         setActionError(null)
         const { error } = await supabase.from('leads').update(d).eq('id',editLead.id)
@@ -358,7 +366,7 @@ export default function PipelinePage() {
 }
 
 // ── Lead Card (mobile) with age + rotting ──
-function LeadCard({ lead, stages, onClick }: { lead: Lead; stages: Stage[]; onClick: () => void }) {
+function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   const age = getDealAge(lead.updated_at || lead.created_at)
   const rot = rottingLevel(age.days, lead.current_stage)
   return (
@@ -375,22 +383,19 @@ function LeadCard({ lead, stages, onClick }: { lead: Lead; stages: Stage[]; onCl
         {lead.amount_paid ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
         : lead.amount_quoted ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200">~${lead.amount_quoted}</span> : null}
 
-        {/* Acceso rápido: abre WhatsApp con la plantilla de la etapa, sin abrir el modal.
-            stopPropagation para que el tap no dispare también el onClick de la tarjeta. */}
+        {/* Antes esto abría wa.me directo: el mensaje no pasaba por la Cloud API,
+            no quedaba en wa_messages y ni el Inbox ni Sofía lo veían nunca.
+            Ahora lleva a la conversación, que es donde vive el historial real. */}
         {normalizePhoneVE(lead.phone) && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              const tpl = WA_TEMPLATES.find(t => t.stages[0] === lead.current_stage) ?? WA_TEMPLATES[0]
-              const link = waLink(lead.phone, tpl.build({ nombre: lead.name, negocio: lead.business_name, plan: lead.plan_interested, monto: lead.amount_quoted }))
-              if (link) window.open(link, '_blank', 'noopener,noreferrer')
-            }}
-            title="Abrir WhatsApp"
-            aria-label={`Abrir WhatsApp con ${lead.name || 'el lead'}`}
+          <Link
+            href={`/dashboard/inbox?tel=${normalizePhoneVE(lead.phone)}`}
+            onClick={(e) => e.stopPropagation()}
+            title="Abrir la conversación en Inbox"
+            aria-label={`Abrir conversación con ${lead.name || 'el lead'}`}
             className="ml-auto w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center hover:brightness-110 active:scale-95 transition-all cursor-pointer flex-shrink-0"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.82 9.82 0 016.99 2.896 9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-          </button>
+            <IconWhatsApp className="w-4 h-4" />
+          </Link>
         )}
       </div>
     </div>
@@ -416,35 +421,10 @@ function NewLeadModal({ onClose, onSave }: { onClose: () => void; onSave: (d: Re
   )
 }
 
-// ── Link Ref ──
-function LinkRefModal({ supabase, onClose, onLinked }: { supabase: ReturnType<typeof createClient>; onClose: () => void; onLinked: () => void }) {
-  const [refCode, setRefCode] = useState(''); const [result, setResult] = useState<string|null>(null); const [loading, setLoading] = useState(false); const [sessionData, setSessionData] = useState<Record<string,string>|null>(null)
-  async function handleLink() {
-    setLoading(true);setResult(null); const code = refCode.trim()
-    const { data: s } = await supabase.from('sessions').select('*').eq('ref_code',code).single()
-    if (!s) { const {data:s2} = await supabase.from('sessions').select('*').eq('ref_code',code.toUpperCase()).single(); if(!s2){setResult('No se encontró sesión');setLoading(false);return}; setSessionData(s2) } else setSessionData(s)
-    setLoading(false)
-  }
-  async function createFromSession() {
-    if(!sessionData) return
-    const {data:ev} = await supabase.from('events').select('event_data').eq('session_id',sessionData.id).eq('event_type','cta_click').order('created_at',{ascending:false}).limit(1)
-    const plan = (ev?.[0]?.event_data as Record<string,string>)?.plan||null
-    let src = 'landing_page'; if(['facebook','instagram','meta'].includes(sessionData.utm_source)) src='meta_ads_direct'
-    const {data:lead} = await supabase.from('leads').insert({ref_code:sessionData.ref_code,source_channel:src,plan_interested:plan&&plan!=='generic'?plan:null}).select().single()
-    if(lead){await supabase.from('sessions').update({lead_id:lead.id}).eq('id',sessionData.id);setResult('Lead creado y vinculado');setTimeout(onLinked,1200)}
-  }
-  return (
-    <Modal title="Vincular ref code" icon={<IconWhatsApp className="w-4 h-4" />} onClose={onClose}>
-      <p className="text-sm text-[var(--text-secondary)] mb-4">Código <code className="bg-[var(--bg-alt)] px-1.5 py-0.5 rounded text-[var(--primary)] font-mono font-bold text-xs">[ref:TW-xxxx]</code> del WhatsApp</p>
-      <div className="flex gap-2 mb-5">
-        <input type="text" value={refCode} onChange={e=>setRefCode(e.target.value)} placeholder="TW-a3f2" className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-[var(--dark)] text-sm font-mono font-bold tracking-wider placeholder:text-[var(--text-muted)] placeholder:font-normal" autoFocus />
-        <button onClick={handleLink} disabled={loading||!refCode.trim()} className="px-5 py-3 rounded-xl bg-[var(--green)] text-white font-semibold text-sm hover:brightness-110 disabled:opacity-40 cursor-pointer active:scale-[0.97]">{loading?'...':'Buscar'}</button>
-      </div>
-      {sessionData&&!result && <div className="bg-[var(--bg-alt)] rounded-xl p-4 mb-4 border border-[var(--border-light)] animate-fade-in-scale"><p className="text-xs font-bold text-[var(--primary)] uppercase tracking-wider font-[Space_Grotesk,sans-serif] mb-3">Sesión encontrada</p><div className="grid grid-cols-2 gap-2 text-xs mb-4"><InfoChip label="Dispositivo" value={sessionData.device_type||'N/A'} />{sessionData.utm_source&&<InfoChip label="Fuente" value={sessionData.utm_source} />}{sessionData.utm_campaign&&<InfoChip label="Campaña" value={sessionData.utm_campaign} />}<InfoChip label="Fecha" value={new Date(sessionData.first_seen_at).toLocaleString('es-VE')} /></div><BtnPrimary onClick={createFromSession}>Crear lead desde sesión</BtnPrimary></div>}
-      {result && <p className={`text-sm text-center py-3 font-semibold animate-fade-in ${result.includes('No se')?'text-red-500':'text-emerald-600'}`}>{result}</p>}
-    </Modal>
-  )
-}
+// LinkRefModal eliminado. Pedía el código [ref:TW-xxxx] que el pixel ya no
+// inyecta en el mensaje, y su createFromSession insertaba un lead sin teléfono
+// ni nombre — duplicando el que el webhook ya crea solo. El rescate de sesiones
+// huérfanas hoy lo hace wa_atribuir_por_ventana en el webhook.
 
 // ── Edit Lead Modal with Timeline ──
 function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
@@ -489,9 +469,9 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
     <Modal title={lead.name||'Lead'} icon={<IconLista className="w-4 h-4" />} onClose={onClose}>
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-[var(--bg-alt)] p-1 rounded-xl">
-        <button onClick={()=>setTab('edit')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='edit'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Datos</button>
-        <button onClick={()=>setTab('whatsapp')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='whatsapp'?'bg-white text-emerald-600 shadow-sm':'text-[var(--text-muted)]'}`}>WhatsApp</button>
-        <button onClick={()=>setTab('timeline')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[Space_Grotesk,sans-serif] transition-all cursor-pointer ${tab==='timeline'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Timeline ({activities.length + transitions.length})</button>
+        <button onClick={()=>setTab('edit')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${tab==='edit'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Datos</button>
+        <button onClick={()=>setTab('whatsapp')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${tab==='whatsapp'?'bg-white text-emerald-600 shadow-sm':'text-[var(--text-muted)]'}`}>WhatsApp</button>
+        <button onClick={()=>setTab('timeline')} className={`flex-1 py-2 rounded-lg text-xs font-semibold font-[family-name:var(--font-display)] transition-all cursor-pointer ${tab==='timeline'?'bg-white text-[var(--dark)] shadow-sm':'text-[var(--text-muted)]'}`}>Timeline ({activities.length + transitions.length})</button>
       </div>
 
       {modalError && (
@@ -537,13 +517,13 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
           </div>
           {sessionInfo && (
             <div className="bg-gradient-to-br from-[var(--bg-alt)] to-[var(--bg)] rounded-xl p-3 border border-[var(--border-light)]">
-              <p className="text-[9px] font-bold text-[var(--primary)] uppercase tracking-wider font-[Space_Grotesk,sans-serif] mb-2">Sesión web</p>
+              <p className="text-[9px] font-bold text-[var(--primary)] uppercase tracking-wider font-[family-name:var(--font-display)] mb-2">Sesión web</p>
               <div className="grid grid-cols-2 gap-2"><InfoChip label="Dispositivo" value={sessionInfo.device_type||'N/A'} />{sessionInfo.utm_source&&<InfoChip label="Fuente" value={sessionInfo.utm_source}/>}<InfoChip label="Visita" value={new Date(sessionInfo.first_seen_at).toLocaleString('es-VE')}/></div>
             </div>
           )}
           <BtnPrimary onClick={()=>onSave({...form,amount_quoted:form.amount_quoted?parseFloat(form.amount_quoted):null,amount_paid:form.amount_paid?parseFloat(form.amount_paid):null,plan_interested:form.plan_interested||null})}>Guardar cambios</BtnPrimary>
           <div className="pt-3 border-t border-[var(--border-light)]">
-            {!confirmDelete ? <button onClick={()=>setConfirmDelete(true)} className="w-full py-2 text-xs text-red-400 hover:text-red-600 cursor-pointer font-[Space_Grotesk,sans-serif]">Eliminar lead</button>
+            {!confirmDelete ? <button onClick={()=>setConfirmDelete(true)} className="w-full py-2 text-xs text-red-400 hover:text-red-600 cursor-pointer font-[family-name:var(--font-display)]">Eliminar lead</button>
             : <div className="flex gap-2 animate-fade-in"><button onClick={onDelete} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 cursor-pointer active:scale-[0.98]">Confirmar</button><button onClick={()=>setConfirmDelete(false)} className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)] cursor-pointer">Cancelar</button></div>}
           </div>
         </div>
@@ -600,7 +580,7 @@ function Modal({title,icon,onClose,children}:{title:string;icon?:React.ReactNode
         <div className="flex min-h-full items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl animate-fade-in-scale border border-[var(--border-light)]" style={{pointerEvents:'auto'}} onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)]">
-              <div className="flex items-center gap-2.5">{icon&&<span className="text-xl">{icon}</span>}<h2 className="font-bold text-lg text-[var(--dark)] font-[Space_Grotesk,sans-serif]">{title}</h2></div>
+              <div className="flex items-center gap-2.5">{icon&&<span className="text-xl">{icon}</span>}<h2 className="font-bold text-lg text-[var(--dark)] font-[family-name:var(--font-display)]">{title}</h2></div>
               <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer p-1.5 rounded-lg hover:bg-[var(--bg-alt)]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div className="p-5">{children}</div>
@@ -610,8 +590,8 @@ function Modal({title,icon,onClose,children}:{title:string;icon?:React.ReactNode
     </>
   )
 }
-function Input({label,value,onChange,type='text',autoFocus}:{label:string;value:string;onChange:(v:string)=>void;type?:string;autoFocus?:boolean}) { return <div><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} autoFocus={autoFocus} className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all"/></div> }
-function Textarea({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}) { return <div><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label><textarea value={value} onChange={e=>onChange(e.target.value)} rows={2} className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all resize-none"/></div> }
-function Select({label,value,onChange,options}:{label:string;value:string;onChange:(v:string)=>void;options:{value:string;label:string}[]}) { return <div><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[Space_Grotesk,sans-serif]">{label}</label><select value={value} onChange={e=>onChange(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all">{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div> }
-function BtnPrimary({onClick,children}:{onClick:()=>void;children:React.ReactNode}) { return <button onClick={onClick} className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98]">{children}</button> }
+function Input({label,value,onChange,type='text',autoFocus}:{label:string;value:string;onChange:(v:string)=>void;type?:string;autoFocus?:boolean}) { return <div><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} autoFocus={autoFocus} className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all"/></div> }
+function Textarea({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}) { return <div><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">{label}</label><textarea value={value} onChange={e=>onChange(e.target.value)} rows={2} className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all resize-none"/></div> }
+function Select({label,value,onChange,options}:{label:string;value:string;onChange:(v:string)=>void;options:{value:string;label:string}[]}) { return <div><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 font-[family-name:var(--font-display)]">{label}</label><select value={value} onChange={e=>onChange(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] transition-all">{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div> }
+function BtnPrimary({onClick,children}:{onClick:()=>void;children:React.ReactNode}) { return <button onClick={onClick} className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all cursor-pointer shadow-md shadow-indigo-500/20 active:scale-[0.98]">{children}</button> }
 function InfoChip({label,value}:{label:string;value:string}) { return <div className="bg-white rounded-lg px-2.5 py-1.5 border border-[var(--border-light)]"><p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">{label}</p><p className="text-xs font-semibold text-[var(--dark)] truncate">{value}</p></div> }

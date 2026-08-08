@@ -14,8 +14,8 @@ export default function NotFound() {
           <text x="103" y="21" fontFamily="Space Grotesk,sans-serif" fontSize="17" fontWeight="700" fill="#fff">Go</text>
         </svg>
 
-        <p className="text-5xl font-bold text-white/15 font-[Space_Grotesk,sans-serif] mb-3">404</p>
-        <h1 className="text-lg font-bold text-white font-[Space_Grotesk,sans-serif] mb-2">
+        <p className="text-5xl font-bold text-white/15 font-[family-name:var(--font-display)] mb-3">404</p>
+        <h1 className="text-lg font-bold text-white font-[family-name:var(--font-display)] mb-2">
           Esta página no existe
         </h1>
         <p className="text-sm text-white/40 mb-7">
@@ -24,7 +24,7 @@ export default function NotFound() {
 
         <Link
           href="/dashboard"
-          className="inline-block py-3 px-6 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all duration-300"
+          className="inline-block py-3 px-6 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all duration-300"
         >
           Ir al dashboard
         </Link>

@@ -27,7 +27,7 @@ export default function GlobalError({
               <text x="103" y="21" fontFamily="Space Grotesk,sans-serif" fontSize="17" fontWeight="700" fill="#fff">Go</text>
             </svg>
 
-            <h1 className="text-xl font-bold text-white font-[Space_Grotesk,sans-serif] mb-2">
+            <h1 className="text-xl font-bold text-white font-[family-name:var(--font-display)] mb-2">
               El portal no pudo arrancar
             </h1>
             <p className="text-sm text-white/40 mb-6">
@@ -45,7 +45,7 @@ export default function GlobalError({
 
             <button
               onClick={() => unstable_retry()}
-              className="w-full py-3 px-4 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] transition-all duration-300 cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl bg-[var(--primary)] text-white font-semibold text-sm font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] transition-all duration-300 cursor-pointer"
             >
               Reintentar
             </button>

@@ -56,7 +56,7 @@ export default function PlantillasWA() {
     <div className="bg-[var(--card)] rounded-2xl p-5 sm:p-6 border border-[var(--border)] shadow-sm">
       <div className="flex items-center gap-2 mb-1">
         <div className="w-1 h-5 rounded-full gradient-bar" />
-        <h2 className="text-sm font-bold text-[var(--dark)] font-[Space_Grotesk,sans-serif] uppercase tracking-wider">
+        <h2 className="text-sm font-bold text-[var(--dark)] font-[family-name:var(--font-display)] uppercase tracking-wider">
           Plantillas de WhatsApp
         </h2>
       </div>
@@ -75,7 +75,7 @@ export default function PlantillasWA() {
         <button
           onClick={subir}
           disabled={subiendo}
-          className="px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[Space_Grotesk,sans-serif] hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-all"
+          className="px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-all"
         >
           {subiendo ? 'Subiendo…' : `Subir las ${PLANTILLAS.length} a Meta`}
         </button>
