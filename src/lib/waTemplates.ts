@@ -75,6 +75,77 @@ export const PLANTILLAS: PlantillaWA[] = [
     ejemplos: ['Carlos', 'tu negocio'],
     footer: 'Responde BAJA si no quieres recibir más mensajes',
   },
+
+  /* ══════════════════════════════════════════════════════════════
+     PRIMER CONTACTO EN FRÍO — para los contactos scrapeados
+     ══════════════════════════════════════════════════════════════
+     Estas van a gente que NUNCA habló con TuWebGo. Meta exige opt-in y estos
+     números no lo tienen, así que el riesgo real no es que rechacen la
+     plantilla: es que el destinatario toque "Bloquear" o "Reportar". Eso baja
+     el quality_score, Meta reduce el límite de mensajería y termina
+     restringiendo el número.
+
+     Por eso todas siguen las mismas reglas:
+     · Decir QUIÉN escribe en la primera línea. Un mensaje anónimo se reporta.
+     · Nombrar el negocio del destinatario: prueba que no es un envío masivo
+       ciego y baja mucho la tasa de bloqueo.
+     · Una sola pregunta, corta, sin presión.
+     · Salida explícita en el footer. Que alguien responda BAJA es infinitamente
+       mejor que un reporte a Meta.
+     · Nada de urgencia falsa, mayúsculas ni promesas. Eso dispara tanto el
+       rechazo de la revisión como el bloqueo del usuario. */
+
+  {
+    name: 'presentacion_negocio',
+    category: 'MARKETING',
+    proposito: 'Primer contacto en frío — presentación',
+    body:
+      'Hola {{1}}, te escribimos de TuWebGo. Hacemos páginas web para negocios en Venezuela ' +
+      'desde $50 y listas en 48 horas. Vimos que {{2}} todavía no tiene una y quisimos ' +
+      'contarte. ¿Te muestro cómo se vería?',
+    ejemplos: ['Carlos', 'Repuestos El Zulia'],
+    footer: 'Responde BAJA y no te escribimos más',
+  },
+  {
+    name: 'oferta_prediseno_frio',
+    category: 'MARKETING',
+    proposito: 'Primer contacto en frío — directo a la oferta',
+    body:
+      'Hola {{1}}, somos TuWebGo. Por $50 te hacemos un pre-diseño real de la página de {{2}} ' +
+      'en 48 horas, y si no te gusta te devolvemos el dinero completo, sin preguntas. ' +
+      '¿Te gustaría verlo?',
+    ejemplos: ['Carlos', 'Repuestos El Zulia'],
+    footer: 'Responde BAJA y no te escribimos más',
+  },
+  {
+    name: 'segundo_intento',
+    category: 'MARKETING',
+    proposito: 'Único reintento para quien no contestó el primero',
+    body:
+      'Hola {{1}}, te escribimos hace unos días de TuWebGo por la página web de {{2}}. ' +
+      'Si te interesa seguimos con gusto, y si no, no te escribimos más. ¿Qué nos dices?',
+    ejemplos: ['Carlos', 'Repuestos El Zulia'],
+    footer: 'Responde BAJA y no te escribimos más',
+  },
+  {
+    name: 'datos_para_arrancar',
+    category: 'UTILITY',
+    proposito: 'Ya aceptó — pedirle logo, fotos y textos',
+    body:
+      'Hola {{1}}, para arrancar con la página de {{2}} necesito unas cositas: tu logo si tienes, ' +
+      'fotos de tus productos o del local, y los textos de qué haces y dónde estás. ' +
+      '¿Me los puedes enviar por aquí?',
+    ejemplos: ['Carlos', 'Repuestos El Zulia'],
+  },
+  {
+    name: 'prediseno_recordatorio',
+    category: 'UTILITY',
+    proposito: 'Se le envió el pre-diseño y no dio señales',
+    body:
+      'Hola {{1}}, te dejamos el pre-diseño de {{2}} hace unos días y no supimos más. ' +
+      '¿Pudiste verlo? Cualquier ajuste que quieras lo hacemos con gusto.',
+    ejemplos: ['Carlos', 'Repuestos El Zulia'],
+  },
 ]
 
 /** Cuerpo con las variables reemplazadas, para previsualizar en el CRM. */

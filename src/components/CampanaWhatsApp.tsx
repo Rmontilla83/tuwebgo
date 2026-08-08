@@ -30,6 +30,7 @@ export default function CampanaWhatsApp() {
   const [conteos, setConteos] = useState<Record<string, number>>({})
   const [campanas, setCampanas] = useState<Progreso[]>([])
   const [iniciadasHoy, setIniciadasHoy] = useState(0)
+  const [salud, setSalud] = useState<{ calidad: string; limite?: string; tasaFallo: number; seguroEnviar: boolean; aviso: string | null } | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,6 +62,13 @@ export default function CampanaWhatsApp() {
     setConteos(c)
     setCampanas((cp.data as Progreso[]) ?? [])
     setIniciadasHoy(Number(ini.data ?? 0))
+
+    // Salud del número: es lo que decide si se puede seguir enviando en frío.
+    try {
+      const r = await fetch('/api/wa/salud')
+      if (r.ok) setSalud(await r.json())
+    } catch { /* si Meta no responde, no bloqueamos la pantalla */ }
+
     setCargando(false)
   }, [supabase])
 
@@ -137,6 +145,45 @@ export default function CampanaWhatsApp() {
 
   return (
     <div className="space-y-4">
+      {/* ── Salud del número: la alerta temprana ── */}
+      {salud && (
+        <div className={`rounded-2xl p-4 border ${
+          salud.calidad === 'RED' ? 'bg-red-50 border-red-300'
+          : salud.calidad === 'YELLOW' ? 'bg-amber-50 border-amber-300'
+          : 'bg-emerald-50 border-emerald-200'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+              salud.calidad === 'RED' ? 'bg-red-500'
+              : salud.calidad === 'YELLOW' ? 'bg-amber-500' : 'bg-emerald-500'
+            }`} />
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-semibold ${
+                salud.calidad === 'RED' ? 'text-red-900'
+                : salud.calidad === 'YELLOW' ? 'text-amber-900' : 'text-emerald-900'
+              }`}>
+                Calidad del número: {
+                  salud.calidad === 'GREEN' ? 'buena'
+                  : salud.calidad === 'YELLOW' ? 'en riesgo'
+                  : salud.calidad === 'RED' ? 'crítica' : 'sin datos aún'
+                }
+                {salud.limite && <span className="font-normal opacity-70"> · límite {salud.limite}</span>}
+              </p>
+              {salud.aviso && (
+                <p className={`text-xs mt-1 ${salud.calidad === 'RED' ? 'text-red-800' : 'text-amber-800'}`}>
+                  {salud.aviso}
+                </p>
+              )}
+              {!salud.aviso && (
+                <p className="text-xs text-emerald-800 mt-0.5">
+                  Meta la calcula con los bloqueos y reportes de los últimos 7 días.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Cupo del día ── */}
       <div className={`rounded-2xl p-4 border ${
         cupoRestante === 0 ? 'bg-red-50 border-red-200' : 'bg-[var(--card)] border-[var(--border)]'
@@ -194,10 +241,10 @@ export default function CampanaWhatsApp() {
               {c.pendientes > 0 && (
                 <button
                   onClick={() => lanzar(c.campaign_id)}
-                  disabled={enviando !== null || cupoRestante === 0}
+                  disabled={enviando !== null || cupoRestante === 0 || salud?.seguroEnviar === false}
                   className="px-3.5 py-2 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 transition-all"
                 >
-                  {enviando === c.campaign_id ? 'Enviando…' : `Enviar ${Math.min(c.pendientes, cupoRestante)}`}
+                  {enviando === c.campaign_id ? 'Enviando…' : salud?.seguroEnviar === false ? 'Envío bloqueado' : `Enviar ${Math.min(c.pendientes, cupoRestante)}`}
                 </button>
               )}
             </div>
@@ -312,6 +359,12 @@ export default function CampanaWhatsApp() {
             <p className="text-[11px] text-amber-900">
               La plantilla tiene que estar <strong>aprobada</strong> por Meta o los envíos fallan.
               Cuando alguien responda, Sofía sigue la conversación sola desde el Inbox.
+              {plantillaSel?.category === 'MARKETING' && (
+                <><br /><br />
+                Esta es de <strong>MARKETING</strong> y va a contactos que no dieron permiso.
+                Empezá con una tanda chica (30–50), mirá la calidad del número al día siguiente,
+                y recién ahí seguí. Si aparecen bloqueos, el mensaje es el problema — no el volumen.</>
+              )}
             </p>
           </div>
 
