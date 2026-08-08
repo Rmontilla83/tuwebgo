@@ -17,7 +17,7 @@ async function getMetrics() {
 
   const [
     sessionsRes, ctaRes, leadsCountRes, leadsRes, recentRes, stagesRes,
-    convsRes, msgsRes,
+    convsRes, msgsRes, costosRes,
   ] = await Promise.all([
     supabase.from('sessions').select('fingerprint_hash', { count: 'exact' }).gte('first_seen_at', startOfMonth),
     supabase.from('events').select('*', { count: 'exact', head: true }).eq('event_type', 'cta_click').gte('created_at', startOfMonth),
@@ -32,12 +32,13 @@ async function getMetrics() {
     supabase.from('wa_conversations')
       .select('id, unread_count, bot_activo, handoff_motivo, window_expires_at, last_message_at, display_name, leads(name)'),
     supabase.from('wa_messages').select('direction, por_bot').gte('created_at', startOfMonth),
+    supabase.rpc('costos_del_mes'),
   ])
 
   assertNoError({
     sesiones: sessionsRes, 'clics CTA': ctaRes, 'conteo de leads': leadsCountRes,
     leads: leadsRes, 'leads recientes': recentRes, 'etapas del pipeline': stagesRes,
-    conversaciones: convsRes, mensajes: msgsRes,
+    conversaciones: convsRes, mensajes: msgsRes, costos: costosRes,
   })
 
   const stages = stagesRes.data ?? []
@@ -97,6 +98,11 @@ async function getMetrics() {
     msgsSofia: msgs.filter(m => m.direction === 'out' && m.por_bot).length,
     msgsRafael: msgs.filter(m => m.direction === 'out' && !m.por_bot).length,
     msgsEntrantes: msgs.filter(m => m.direction === 'in').length,
+    costos: (Array.isArray(costosRes.data) ? costosRes.data[0] : costosRes.data) as {
+      wa_plantillas: number; wa_costo: number; wa_servicio_gratis: number
+      ia_llamadas: number; ia_tokens_in: number; ia_tokens_out: number
+      ia_costo: number; total: number
+    } | null,
   }
 }
 
@@ -198,6 +204,68 @@ export default async function DashboardPage() {
           </p>
         )}
       </div>
+
+      {/* ── Cuánto cuesta Sofía ── */}
+      {m.costos && (
+        <div className="mb-6 bg-[var(--card)] rounded-2xl p-5 border border-[var(--border)] shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-5 rounded-full gradient-bar" />
+              <h2 className="text-sm font-bold text-[var(--dark)] font-[family-name:var(--font-display)] uppercase tracking-wider">
+                Costo del mes
+              </h2>
+            </div>
+            <p className="text-2xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tabular-nums">
+              ${Number(m.costos.total).toFixed(2)}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-[var(--bg-alt)] border border-[var(--border-light)]">
+              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">WhatsApp</p>
+              <p className="text-lg font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tabular-nums mt-0.5">
+                ${Number(m.costos.wa_costo).toFixed(2)}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                {m.costos.wa_plantillas} {m.costos.wa_plantillas === 1 ? 'plantilla' : 'plantillas'} enviadas
+              </p>
+              {m.costos.wa_servicio_gratis > 0 && (
+                <p className="text-[11px] text-emerald-700 mt-0.5">
+                  +{m.costos.wa_servicio_gratis} respuestas sin costo
+                </p>
+              )}
+            </div>
+
+            <div className="p-3 rounded-xl bg-[var(--bg-alt)] border border-[var(--border-light)]">
+              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Gemini</p>
+              <p className="text-lg font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tabular-nums mt-0.5">
+                ${Number(m.costos.ia_costo).toFixed(2)}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                {m.costos.ia_llamadas} {m.costos.ia_llamadas === 1 ? 'respuesta' : 'respuestas'} redactadas
+              </p>
+              {m.costos.ia_llamadas > 0 && (
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5 tabular-nums">
+                  {((Number(m.costos.ia_tokens_in) + Number(m.costos.ia_tokens_out)) / 1000).toFixed(1)}k tokens
+                </p>
+              )}
+            </div>
+          </div>
+
+          {m.costos.wa_plantillas > 0 && m.wonLeads > 0 && (
+            <p className="text-[11px] text-[var(--text-secondary)] mt-3 pt-3 border-t border-[var(--border-light)]">
+              Costo por venta cerrada:{' '}
+              <span className="font-semibold text-[var(--dark)] tabular-nums">
+                ${(Number(m.costos.total) / m.wonLeads).toFixed(2)}
+              </span>
+            </p>
+          )}
+
+          <p className="text-[10px] text-[var(--text-muted)] mt-2">
+            Estimado con precios de lista. La factura de Meta y la de Google son la cifra real.
+          </p>
+        </div>
+      )}
 
       {/* ── Marketing ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

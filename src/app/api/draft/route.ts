@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type ContextoLead, type TurnoConversacion } from '@/lib/gemini'
 
 export const runtime = 'nodejs'
@@ -50,14 +51,19 @@ export async function POST(request: Request) {
   }))
 
   try {
-    const { texto, tokens } = await redactarBorrador({
+    const { texto, tokensIn, tokensOut, modelo } = await redactarBorrador({
       apiKey,
       modelo: process.env.GEMINI_MODEL,
       lead: body.lead ?? {},
       conversacion: recorte,
       instruccionExtra: body.instruccion?.slice(0, 500),
     })
-    return NextResponse.json({ texto, tokens })
+    // El botón Sugerir cuesta igual que una respuesta automática.
+    await createAdminClient().from('ia_uso').insert({
+      modelo, contexto: 'borrador', tokens_in: tokensIn, tokens_out: tokensOut,
+    })
+
+    return NextResponse.json({ texto, tokens: tokensOut })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error desconocido'
     console.error('[api/draft]', msg)

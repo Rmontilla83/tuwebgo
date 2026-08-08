@@ -297,7 +297,7 @@ export function construirPrompt(
 type RespuestaGemini = {
   candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]
   error?: { message?: string; code?: number }
-  usageMetadata?: { candidatesTokenCount?: number }
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
 }
 
 const ESQUEMA_RESPUESTA = {
@@ -371,7 +371,7 @@ export async function redactarBorrador(opts: {
   lead: ContextoLead
   conversacion: TurnoConversacion[]
   instruccionExtra?: string
-}): Promise<{ texto: string; handoff: MotivoHandoff; tokens: number }> {
+}): Promise<{ texto: string; handoff: MotivoHandoff; tokensIn: number; tokensOut: number; modelo: string }> {
   const modelo = opts.modelo || MODELO_POR_DEFECTO
 
   const sistema = [PERSONA, '\n=== LA EMPRESA ===\n' + EMPRESA, '\n=== CATÁLOGO ===\n' + CATALOGO, '\n' + INSTRUCCION_HANDOFF].join('\n')
@@ -426,7 +426,11 @@ export async function redactarBorrador(opts: {
   return {
     texto: mensaje.replace(/^["“”']|["“”']$/g, '').trim(),
     handoff,
-    tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+    // Se devuelven ambos: Gemini cobra entrada y salida a precios distintos
+    // (la salida cuesta ~8x más), así que sumarlos daría un número inútil.
+    tokensIn: data.usageMetadata?.promptTokenCount ?? 0,
+    tokensOut: data.usageMetadata?.candidatesTokenCount ?? 0,
+    modelo,
   }
 }
 

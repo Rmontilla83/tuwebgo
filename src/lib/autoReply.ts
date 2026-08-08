@@ -82,7 +82,7 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
     }
 
     // ── Redacción ──
-    const { texto, handoff } = await redactarBorrador({
+    const { texto, handoff, tokensIn, tokensOut, modelo } = await redactarBorrador({
       apiKey,
       modelo: process.env.GEMINI_MODEL,
       lead: {
@@ -90,6 +90,12 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
         plan: lead.plan_interested, montoCotizado: lead.amount_quoted, refCode: lead.ref_code,
       },
       conversacion: historial,
+    })
+
+    // Se registra ANTES de enviar: el token se gastó aunque el envío falle.
+    await db.from('ia_uso').insert({
+      modelo, contexto: 'auto', tokens_in: tokensIn, tokens_out: tokensOut,
+      conversation_id: convId,
     })
 
     if (!texto.trim()) { await apartarse(db, convId, 'El asistente no pudo redactar'); return }
