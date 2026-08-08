@@ -106,7 +106,7 @@ export default function PlantillasWA() {
           <p className="text-xs text-amber-800 mt-1">
             Meta suele aprobar en minutos, pero con una cuenta nueva y sin verificación de negocio
             puede tardar hasta 24 h — y las de categoría MARKETING siempre tardan más que las UTILITY.
-            Si pasan 48 h, verificá el negocio en Business Manager: es lo que más acelera la revisión.
+            Si pasan 48 h, verifica el negocio en Business Manager: es lo que más acelera la revisión.
           </p>
         </div>
       )}

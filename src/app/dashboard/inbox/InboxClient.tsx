@@ -41,7 +41,7 @@ const MOTIVO_LEGIBLE: Record<string, string> = {
   // Sofía ya no se aparta acá — entrega los datos de pago y sigue. Queda por
   // si hay conversaciones viejas pausadas con este motivo.
   quiere_comprar: 'El cliente quiere comprar — te toca cerrar',
-  pago_reportado: 'Dice que ya pagó — verificá que entró antes de arrancar',
+  pago_reportado: 'Dice que ya pagó — verifica que entró antes de arrancar',
   queja: 'Reclamo — atiéndelo tú',
   fuera_de_alcance: 'Pidió algo fuera del catálogo',
   pide_humano: 'Pidió hablar con una persona',
@@ -106,7 +106,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
 
   // Una conversación ahora tiene URL: ?conv=<id> o ?tel=<e164>. Sin esto no se
   // podía enlazar desde el Dashboard ni desde una tarjeta del Pipeline, y no
-  // había forma de mandarle a alguien "mirá esta conversación".
+  // había forma de mandarle a alguien "mira esta conversación".
   const params = useSearchParams()
   useEffect(() => {
     if (activa) return
@@ -421,8 +421,8 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
           onClick={() => recargarConvs()}
           title={
             rt === 'ok' ? 'Conectado en vivo — los mensajes entran solos'
-            : rt === 'error' ? 'Se perdió la conexión en vivo. Tocá para recargar.'
-            : rt === 'sin-sesion' ? 'Sin sesión activa. Volvé a entrar.'
+            : rt === 'error' ? 'Se perdió la conexión en vivo. Toca para recargar.'
+            : rt === 'sin-sesion' ? 'Sin sesión activa. Vuelve a entrar.'
             : 'Conectando…'
           }
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] cursor-pointer flex-shrink-0"
@@ -519,7 +519,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
         <div className={`bg-[var(--card)] rounded-2xl border border-[var(--border)] flex-col overflow-hidden ${activa ? 'flex' : 'hidden lg:flex'}`}>
           {!conv ? (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-[var(--text-muted)]">Elegí una conversación</p>
+              <p className="text-sm text-[var(--text-muted)]">Elige una conversación</p>
             </div>
           ) : (
             <>
@@ -688,7 +688,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                     onChange={(e) => setBorrador(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) enviar() }}
                     rows={2}
-                    placeholder="Escribí un mensaje... (Ctrl+Enter para enviar)"
+                    placeholder="Escribe un mensaje... (Ctrl+Enter para enviar)"
                     className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] resize-none placeholder:text-[var(--text-muted)]"
                   />
                   <button

@@ -71,11 +71,11 @@ export async function GET() {
       seguroEnviar,
       aviso:
         calidad === 'RED'
-          ? 'Meta bajó la calidad del número a ROJO. Pará las campañas ya: si sigue así el número queda restringido.'
+          ? 'Meta bajó la calidad del número a ROJO. Detén las campañas ya: si sigue así el número queda restringido.'
           : calidad === 'YELLOW'
-            ? 'La calidad bajó a AMARILLO — hay bloqueos o reportes. Pará, revisá el mensaje y esperá a que vuelva a verde.'
+            ? 'La calidad bajó a AMARILLO — hay bloqueos o reportes. Detente, revisa el mensaje y espera a que vuelva a verde.'
             : tasaFallo >= 20
-              ? `${tasaFallo}% de los envíos está fallando. Revisá que la plantilla esté aprobada antes de seguir.`
+              ? `${tasaFallo}% de los envíos está fallando. Revisa que la plantilla esté aprobada antes de seguir.`
               : null,
     })
   } catch {

@@ -5,6 +5,7 @@ import {
   ICONO_CANAL, IconMarcador, IconOjo, IconClic, IconUsuario, IconDinero,
   IconLista, IconChat, IconAsistente, IconMano, IconCompra, IconFlecha,
 } from '@/components/icons'
+import PagosPorVerificar, { type PagoPorVerificar } from '@/components/PagosPorVerificar'
 
 /**
  * Con Sofía atendiendo sola, lo primero que Rafael necesita al abrir el CRM
@@ -17,7 +18,7 @@ async function getMetrics() {
 
   const [
     sessionsRes, ctaRes, leadsCountRes, leadsRes, recentRes, stagesRes,
-    convsRes, msgsRes, costosRes,
+    convsRes, msgsRes, costosRes, pagosRes,
   ] = await Promise.all([
     supabase.from('sessions').select('fingerprint_hash', { count: 'exact' }).gte('first_seen_at', startOfMonth),
     supabase.from('events').select('*', { count: 'exact', head: true }).eq('event_type', 'cta_click').gte('created_at', startOfMonth),
@@ -33,12 +34,14 @@ async function getMetrics() {
       .select('id, unread_count, bot_activo, handoff_motivo, window_expires_at, last_message_at, display_name, leads(name)'),
     supabase.from('wa_messages').select('direction, por_bot').gte('created_at', startOfMonth),
     supabase.rpc('costos_del_mes'),
+    supabase.from('v_pagos_por_verificar').select('*').limit(20),
   ])
 
   assertNoError({
     sesiones: sessionsRes, 'clics CTA': ctaRes, 'conteo de leads': leadsCountRes,
     leads: leadsRes, 'leads recientes': recentRes, 'etapas del pipeline': stagesRes,
     conversaciones: convsRes, mensajes: msgsRes, costos: costosRes,
+    'pagos por verificar': pagosRes,
   })
 
   const stages = stagesRes.data ?? []
@@ -93,6 +96,11 @@ async function getMetrics() {
       .sort((a, b) => new Date(a.last_message_at ?? 0).getTime() - new Date(b.last_message_at ?? 0).getTime())
       .slice(0, 3),
     sinLeer, ventanaPorVencer,
+    // Deliberadamente NO se filtra por unread_count. Un pago por verificar no
+    // se resuelve leyendo el chat, se resuelve mirando el banco: si dependiera
+    // de los no leídos, abrir la conversación para ver el comprobante borraría
+    // la tarea. Solo se apaga cuando alguien confirma que el dinero entró.
+    pagosPorVerificar: (pagosRes.data ?? []) as PagoPorVerificar[],
     porCobrar: porCobrar.length,
     montoPorCobrar: porCobrar.reduce((s, l) => s + Number(l.amount_quoted ?? 0), 0),
     msgsSofia: msgs.filter(m => m.direction === 'out' && m.por_bot).length,
@@ -162,6 +170,9 @@ export default async function DashboardPage() {
           sub={m.montoPorCobrar > 0 ? `$${m.montoPorCobrar} en juego` : 'ninguno'}
           icono={<IconCompra className="w-[18px] h-[18px]" />} urgente />
       </div>
+
+      {/* ── Plata parada: va antes que todo lo demás ── */}
+      <PagosPorVerificar pagos={m.pagosPorVerificar} />
 
       {/* ── Quiénes esperan ── */}
       {m.teEsperanDetalle.length > 0 && (

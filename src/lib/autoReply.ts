@@ -169,6 +169,26 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       }
     }
 
+    // Un pago reportado se registra como TAREA, no solo como mensaje.
+    //
+    // Antes esto vivía únicamente en el handoff, y tanto la tarjeta del
+    // Dashboard como el globo de la navegación filtran por unread_count > 0.
+    // Abrir la conversación para mirar el comprobante marca leído y borraba
+    // el recordatorio: el gesto natural hacía desaparecer la tarea.
+    if (handoff === 'pago_reportado') {
+      // Se miran los últimos entrantes, no solo el último: el patrón real es
+      // mandar la captura en un mensaje y "listo" en el siguiente. Con solo
+      // mirar el último, la mitad de las veces se pierde el comprobante o se
+      // pierde la referencia. `msgs` viene del más nuevo al más viejo.
+      const ultimos = (msgs ?? []).filter((m) => m.direction === 'in').slice(0, 3)
+      const { error: pagoErr } = await db.rpc('pago_reportar', {
+        p_conv_id: convId,
+        p_mensaje: ultimos.find((m) => m.body?.trim())?.body ?? '',
+        p_con_comprobante: ultimos.some((m) => ['image', 'document'].includes(m.msg_type ?? '')),
+      })
+      if (pagoErr) console.error('[autoReply] registrar pago:', pagoErr.message)
+    }
+
     // No toda señal aparta al bot. "quiere_comprar" mueve la etapa pero Sofía
     // sigue: ella ya le dio los datos de pago y tiene que poder responder las
     // dudas que vienen justo después ("¿me lo mandas de nuevo?", "¿en cuál

@@ -53,7 +53,7 @@ export default function ImportarContactos({ onImportado }: { onImportado?: () =>
         </h2>
       </div>
       <p className="text-sm text-[var(--text-secondary)] mt-2 mb-4">
-        Pegá lo que tengas: copiado de Excel, un CSV, o solo una columna de teléfonos.
+        Pega lo que tengas: copiado de Excel, un CSV, o solo una columna de teléfonos.
         Entran como <span className="font-semibold">Sin contactar</span> y no se duplican.
       </p>
 
@@ -126,7 +126,7 @@ export default function ImportarContactos({ onImportado }: { onImportado?: () =>
         disabled={importando || !analisis.filas.length}
         className="w-full mt-3 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:bg-[var(--primary-light)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all active:scale-[0.98]"
       >
-        {importando ? 'Importando…' : analisis.filas.length ? `Importar ${analisis.filas.length} contactos` : 'Pegá los contactos arriba'}
+        {importando ? 'Importando…' : analisis.filas.length ? `Importar ${analisis.filas.length} contactos` : 'Pega los contactos arriba'}
       </button>
     </div>
   )

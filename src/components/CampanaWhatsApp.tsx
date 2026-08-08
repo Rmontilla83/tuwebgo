@@ -344,7 +344,7 @@ export default function CampanaWhatsApp() {
             <p className="text-xs text-[var(--text-secondary)]">
               {dias > 1
                 ? `Se van a mandar en ${dias} días por el límite de Meta.`
-                : alcance > 0 ? 'Entran todos hoy.' : 'Elegí al menos una etapa con contactos.'}
+                : alcance > 0 ? 'Entran todos hoy.' : 'Elige al menos una etapa con contactos.'}
             </p>
             {plantillaSel && alcance > 0 && (
               <p className="text-xs text-[var(--text-secondary)]">
@@ -362,8 +362,8 @@ export default function CampanaWhatsApp() {
               {plantillaSel?.category === 'MARKETING' && (
                 <><br /><br />
                 Esta es de <strong>MARKETING</strong> y va a contactos que no dieron permiso.
-                Empezá con una tanda chica (30–50), mirá la calidad del número al día siguiente,
-                y recién ahí seguí. Si aparecen bloqueos, el mensaje es el problema — no el volumen.</>
+                Empieza con una tanda chica (30–50), mira la calidad del número al día siguiente,
+                y ahí sí sigues. Si aparecen bloqueos, el mensaje es el problema — no el volumen.</>
               )}
             </p>
           </div>
