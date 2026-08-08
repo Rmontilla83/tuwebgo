@@ -1,14 +1,21 @@
 /**
  * Sofía — la asistente de WhatsApp de TuWebGo.
  *
- * Atiende sola las conversaciones entrantes y las lleva hasta que el cliente
- * decide comprar. Ahí para y le pasa el turno a Rafael: cobrar, resolver una
- * queja o improvisar algo fuera de catálogo son cosas de humano.
+ * Atiende sola las conversaciones entrantes y las lleva hasta el pago: cuando
+ * el cliente decide, ella misma le entrega los datos de cobro con el monto en
+ * bolívares a la tasa BCV del día (ver lib/pagos.ts).
+ *
+ * Donde SÍ para es un paso después: cuando el cliente dice que ya pagó. Ahí
+ * acusa recibo, manda el formulario y le pasa el turno a Rafael. La línea es
+ * "informar sí, confirmar no" — verificar que entró el dinero, resolver una
+ * queja o improvisar fuera de catálogo son cosas de humano.
  *
  * Toda la información comercial vive en CATALOGO y viene TEXTUAL de la landing
  * (secciones #inicio, #problemas, #proceso, #seo, #precios, #portafolio y #faq
  * de Tuwebgolanding/index.html). Cuando cambien los precios se cambian ACÁ.
  */
+
+import { bloquePagos } from '@/lib/pagos'
 
 export const MODELO_POR_DEFECTO = 'gemini-2.5-flash'
 export const NOMBRE_BOT = 'Sofía'
@@ -45,7 +52,8 @@ sitemap). Carga en menos de 2 segundos. Diseño primero para celular, porque el
 
 PORTAFOLIO (mencionar solo si lo piden, y solo estos)
 Wuipi (wuipi.net) · CATEMVE (catemve.com) · MiloApp (miloapp.fit) ·
-Proyben (proyben.com) · QuienRepara (quienrepara.com)
+Proyben (proyben.com) · Atryum (atryum.net) · Fortius (fortius.fit) ·
+Universo de Fueguito (eluniversodefueguito.com)
 `.trim()
 
 const CATALOGO = `
@@ -124,6 +132,8 @@ PAGOS
 Zelle, PayPal, Binance (USDT), pago móvil y transferencia bancaria.
 El pre-diseño se paga por adelantado. El resto: 50% al aprobar el diseño y 50%
 al entregar.
+Los datos concretos de cobro van en su propia sección más abajo, con la tasa
+del día ya calculada. Usá esos números, no otros.
 
 HOSTING Y DOMINIO — importante, se pregunta mucho
 El hosting va INCLUIDO y GRATIS en todos los planes. No hay mensualidad de
@@ -217,6 +227,9 @@ REGLAS QUE NO SE ROMPEN
   cantidad de ventas ni de clientes.
 - Nunca inventes nombres de clientes, casos de éxito ni cifras.
 - Nunca pidas datos de tarjetas ni claves.
+- Nunca des un pago por recibido. Podés ENTREGAR los datos de cobro, nunca
+  CONFIRMAR que el dinero llegó: no tenés acceso a la cuenta. Eso lo verifica
+  una persona.
 - Si el mensaje no se entiende, pedí que aclare en vez de asumir.
 `.trim()
 
@@ -240,9 +253,16 @@ export type TurnoConversacion = {
   fecha?: string | null
 }
 
-/** Motivos por los que el bot se aparta y llama a Rafael. */
+/**
+ * Señales que Sofía devuelve junto al mensaje.
+ *
+ * No todas apartan al bot. `quiere_comprar` mueve el lead a "por cobrar" pero
+ * Sofía SIGUE atendiendo, porque ahora ella misma entrega los datos de pago.
+ * Cuál pausa el bot se decide en HANDOFF_PAUSA_BOT (lib/config.ts).
+ */
 export type MotivoHandoff =
   | 'quiere_comprar'
+  | 'pago_reportado'
   | 'queja'
   | 'fuera_de_alcance'
   | 'pide_humano'
@@ -310,10 +330,11 @@ const ESQUEMA_RESPUESTA = {
     },
     handoff: {
       type: 'string',
-      enum: ['ninguno', 'quiere_comprar', 'queja', 'fuera_de_alcance', 'pide_humano'],
+      enum: ['ninguno', 'quiere_comprar', 'pago_reportado', 'queja', 'fuera_de_alcance', 'pide_humano'],
       description:
-        'ninguno = seguí atendiendo. quiere_comprar = el cliente aceptó comprar, ' +
-        'pidió datos de pago o dijo que va a pagar. queja = está molesto o reclama. ' +
+        'ninguno = seguí atendiendo. quiere_comprar = el cliente aceptó comprar o ' +
+        'pidió los datos de pago. pago_reportado = dijo que YA pagó, mandó una ' +
+        'referencia o una captura. queja = está molesto o reclama. ' +
         'fuera_de_alcance = pide algo que no está en el catálogo. ' +
         'pide_humano = pidió hablar con una persona.',
     },
@@ -328,12 +349,20 @@ Devolvés dos cosas: el mensaje y una señal de traspaso.
 TU TRABAJO ES LLEVAR LA CONVERSACIÓN HASTA LA VENTA. El traspaso es la
 excepción, no el reflejo. Por defecto siempre es "ninguno" — seguís vos.
 
-Solo poné handoff distinto de "ninguno" en estos cuatro casos:
+Solo poné handoff distinto de "ninguno" en estos casos:
 
 - quiere_comprar → el cliente DECIDIÓ. Dijo "lo quiero", "dale", "cómo te
   pago", "listo, arranquemos", o aceptó explícitamente un plan.
-  Tu mensaje: confirmá con entusiasmo y decile que ya le pasan los datos de
-  pago. NUNCA inventes números de cuenta, correos de Zelle ni links de pago.
+  Tu mensaje: confirmá con entusiasmo y DALE LOS DATOS DE PAGO de una vez, los
+  tenés en la sección de formas de pago. No lo hagas esperar por algo que ya
+  tenés a mano. Después de esto SEGUÍS vos: la conversación no se traspasa.
+  Lo único que nunca inventás son datos que no estén en esa sección.
+
+- pago_reportado → el cliente dice que YA pagó: manda una referencia, una
+  captura, un "listo, te transferí". Tu mensaje: acusá recibo aclarando que lo
+  están VERIFICANDO (vos no ves la cuenta, no confirmes nada) y mandale el
+  formulario para arrancar. Ver la sección de formas de pago, ahí está el
+  detalle exacto.
 
 - queja → está molesto, reclama, o menciona un problema con un trabajo ya
   entregado. Tu mensaje: reconocé sin excusas y decí que alguien del equipo le
@@ -346,7 +375,7 @@ Solo poné handoff distinto de "ninguno" en estos cuatro casos:
   especial o un descuento que no está en el catálogo, o plantea algo que
   necesita una decisión que no te corresponde.
 
-NO es fuera_de_alcance, y tenés que SEGUIR la conversación normalmente, cuando:
+NO es handoff, y tenés que SEGUIR la conversación normalmente, cuando:
 - Preguntan si hacemos algo que no hacemos (apps, redes sociales, publicidad) y
   vos podés responder con claridad qué sí hacemos → respondé y volvé a llevarlo
   al pre-diseño. Eso es vender, no trabarse.
@@ -374,7 +403,15 @@ export async function redactarBorrador(opts: {
 }): Promise<{ texto: string; handoff: MotivoHandoff; tokensIn: number; tokensOut: number; modelo: string }> {
   const modelo = opts.modelo || MODELO_POR_DEFECTO
 
-  const sistema = [PERSONA, '\n=== LA EMPRESA ===\n' + EMPRESA, '\n=== CATÁLOGO ===\n' + CATALOGO, '\n' + INSTRUCCION_HANDOFF].join('\n')
+  // Los pagos se arman acá y no arriba porque llevan la tasa BCV del día: un
+  // bloque construido al desplegar quedaría con la tasa de ese día para siempre.
+  const sistema = [
+    PERSONA,
+    '\n=== LA EMPRESA ===\n' + EMPRESA,
+    '\n=== CATÁLOGO ===\n' + CATALOGO,
+    '\n=== COBRO ===\n' + (await bloquePagos()),
+    '\n' + INSTRUCCION_HANDOFF,
+  ].join('\n')
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
@@ -436,6 +473,7 @@ export async function redactarBorrador(opts: {
 
 export const ETIQUETA_HANDOFF: Record<string, string> = {
   quiere_comprar: 'Quiere comprar',
+  pago_reportado: 'Reportó un pago — verificar',
   queja: 'Reclamo',
   fuera_de_alcance: 'Fuera de catálogo',
   pide_humano: 'Pidió hablar con alguien',

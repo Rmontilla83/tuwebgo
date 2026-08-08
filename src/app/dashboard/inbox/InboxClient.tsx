@@ -38,7 +38,10 @@ type Message = {
 }
 
 const MOTIVO_LEGIBLE: Record<string, string> = {
+  // Sofía ya no se aparta acá — entrega los datos de pago y sigue. Queda por
+  // si hay conversaciones viejas pausadas con este motivo.
   quiere_comprar: 'El cliente quiere comprar — te toca cerrar',
+  pago_reportado: 'Dice que ya pagó — verificá que entró antes de arrancar',
   queja: 'Reclamo — atendelo vos',
   fuera_de_alcance: 'Pidió algo fuera del catálogo',
   pide_humano: 'Pidió hablar con una persona',
@@ -47,6 +50,7 @@ const MOTIVO_LEGIBLE: Record<string, string> = {
 /** Versión corta para la lista, donde el espacio es poco. */
 const ETIQUETA_CORTA: Record<string, string> = {
   quiere_comprar: 'Quiere comprar',
+  pago_reportado: 'Verificar pago',
   queja: 'Reclamo',
   fuera_de_alcance: 'Fuera de catálogo',
   pide_humano: 'Pidió una persona',

@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type TurnoConversacion } from '@/lib/gemini'
-import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO } from '@/lib/config'
+import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, HANDOFF_PAUSA_BOT } from '@/lib/config'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 
@@ -17,10 +17,14 @@ type Db = ReturnType<typeof createAdminClient>
  *   2. Bot pausado en esa conversación      → no responde
  *   3. Tope de respuestas seguidas          → se aparta (protege de bucles)
  *   4. Ventana de 24h cerrada               → no responde (Meta lo rechazaría)
- *   5. El modelo detecta cierre/queja       → responde y se aparta
+ *   5. El modelo detecta pago/queja         → responde y se aparta
  *   6. Cualquier error                      → se aparta, nunca rompe el webhook
  *
  * Apartarse = bot_activo en false + handoff_motivo. Rafael lo ve en el inbox.
+ *
+ * Ojo con el punto 5: decidir comprar YA NO aparta al bot. Sofía entrega los
+ * datos de pago y sigue. El corte está en que el cliente diga que pagó, porque
+ * eso hay que verificarlo en el banco. Ver HANDOFF_PAUSA_BOT en lib/config.ts.
  */
 export async function responderAutomatico(db: Db, convId: string): Promise<void> {
   try {
@@ -155,7 +159,11 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       }
     }
 
-    if (handoff) {
+    // No toda señal aparta al bot. "quiere_comprar" mueve la etapa pero Sofía
+    // sigue: ella ya le dio los datos de pago y tiene que poder responder las
+    // dudas que vienen justo después ("¿me lo mandas de nuevo?", "¿en cuál
+    // banco?"). Apartarse ahí dejaba la venta esperando a que Rafael mirara.
+    if (handoff && HANDOFF_PAUSA_BOT.has(handoff)) {
       await apartarse(db, convId, handoff)
     }
   } catch (e) {

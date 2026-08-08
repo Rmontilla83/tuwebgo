@@ -96,6 +96,7 @@ export const ICONO_ACTIVIDAD: Record<string, (p: Props) => React.JSX.Element> = 
 
 export const ICONO_HANDOFF: Record<string, (p: Props) => React.JSX.Element> = {
   quiere_comprar: IconCompra,
+  pago_reportado: IconDinero,
   queja: IconAlerta,
   fuera_de_alcance: IconPregunta,
   pide_humano: IconMano,
