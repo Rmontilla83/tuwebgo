@@ -364,7 +364,9 @@ export default async function DashboardPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name || lead.business_name || 'Sin nombre'}</p>
-                      {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
+                      {/* Solo si aporta algo distinto al título: con contactos
+                          scrapeados el negocio YA es el título. */}
+                      {lead.name && lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
                     </div>
                     <span className={`inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${STAGE_COLORS[lead.current_stage] ?? 'bg-gray-50 text-gray-500 border-gray-200'}`}>
                       {m.stages.find(s => s.slug === lead.current_stage)?.label || lead.current_stage}

@@ -12,8 +12,28 @@ type Lead = {
   id: string; name: string | null; phone: string | null; business_name: string | null
   source_channel: string; current_stage: string; plan_interested: string | null
   amount_quoted: number | null; amount_paid: number | null; notes: string | null
+  business_type: string | null; ciudad: string | null; estado: string | null; prioridad: number | null
   ref_code: string | null; created_at: string; updated_at: string
 }
+/**
+ * Qué mostrar en una tarjeta cuando no hay persona identificada.
+ *
+ * Los contactos de scraping traen el nombre del NEGOCIO, no el de quien
+ * atiende. Titular eso "Sin nombre" hace que 173 tarjetas parezcan un error
+ * de carga cuando el dato bueno está ahí al lado.
+ */
+function tituloYDetalle(lead: Lead): { titulo: string; detalle: string | null } {
+  if (lead.name?.trim()) {
+    return { titulo: lead.name, detalle: lead.business_name || null }
+  }
+  if (lead.business_name?.trim()) {
+    // Sin persona: el negocio manda, y abajo va lo que ayuda a elegir.
+    const partes = [lead.business_type, lead.ciudad].filter(Boolean)
+    return { titulo: lead.business_name, detalle: partes.length ? partes.join(' · ') : null }
+  }
+  return { titulo: 'Sin nombre', detalle: lead.business_name || null }
+}
+
 type Stage = { slug: string; label: string; sort_order: number; is_won: boolean; is_lost: boolean; win_probability: number }
 type Activity = { id: number; lead_id: string; activity_type: string; content: string; created_at: string }
 type Transition = { from_stage: string | null; to_stage: string; transitioned_at: string }
@@ -324,10 +344,10 @@ export default function PipelinePage() {
                       <div key={lead.id} draggable onDragStart={()=>setDraggedLead(lead.id)} onDragEnd={()=>{setDraggedLead(null);setDragOver(null)}} onClick={()=>setEditLead(lead)}
                         className={`bg-white rounded-xl p-3 border border-[var(--border-light)] shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.97] group ${draggedLead===lead.id?'opacity-30 scale-95':''} ${ROTTING_STYLES[rot]}`}>
                         <div className="flex items-start justify-between gap-1">
-                          <p className="font-semibold text-[13px] text-[var(--dark)] leading-snug truncate">{lead.name || lead.business_name || 'Sin nombre'}</p>
+                          <p className="font-semibold text-[13px] text-[var(--dark)] leading-snug truncate">{tituloYDetalle(lead).titulo}</p>
                           <span className={`text-[9px] flex-shrink-0 mt-0.5 ${ROTTING_BADGE[rot]}`}>{age.text}</span>
                         </div>
-                        {lead.business_name && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
+                        {tituloYDetalle(lead).detalle && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">{tituloYDetalle(lead).detalle}</p>}
                         <div className="flex items-center gap-1 mt-2 flex-wrap">
                           {lead.plan_interested && <span className="text-[9px] lg:text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[var(--bg-alt)] text-[var(--primary)] border border-[var(--border-light)]">{PLAN_LABELS[lead.plan_interested]||lead.plan_interested}</span>}
                           {lead.amount_paid ? <span className="text-[9px] lg:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200">${lead.amount_paid}</span>
@@ -372,8 +392,8 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
     <div onClick={onClick} className={`bg-white rounded-xl p-4 border border-[var(--border-light)] shadow-sm active:scale-[0.98] transition-all cursor-pointer ${ROTTING_STYLES[rot]}`}>
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name || lead.business_name || 'Sin nombre'}</p>
-          {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
+          <p className="font-semibold text-sm text-[var(--dark)] truncate">{tituloYDetalle(lead).titulo}</p>
+          {tituloYDetalle(lead).detalle && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{tituloYDetalle(lead).detalle}</p>}
         </div>
         <span className={`text-[10px] flex-shrink-0 ${ROTTING_BADGE[rot]}`}>{age.text}</span>
       </div>
