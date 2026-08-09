@@ -1,10 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { assertNoError } from '@/lib/supabase/errors'
 import InboxClient, { type Conversation } from './InboxClient'
+import { requerirSesion } from '@/lib/supabase/requerirSesion'
 
 const PAGE = 50
 
 export default async function InboxPage() {
+  // Segunda cerradura: no depender solo del proxy (ver requerirSesion).
+  await requerirSesion()
   const supabase = await createClient()
 
   // Carga inicial en servidor: evita el efecto-en-montaje del cliente y hace que

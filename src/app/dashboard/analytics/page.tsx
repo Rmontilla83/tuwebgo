@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { assertNoError } from '@/lib/supabase/errors'
 import { IconGrafico } from '@/components/icons'
+import { requerirSesion } from '@/lib/supabase/requerirSesion'
 
 // Techo explícito por query. PostgREST puede truncar en silencio según la
 // config del proyecto; sin un límite declarado no hay forma de saber si una
@@ -142,6 +143,8 @@ const SECTION_LABELS: Record<string, string> = {
 }
 
 export default async function AnalyticsPage() {
+  // Segunda cerradura: no depender solo del proxy (ver requerirSesion).
+  await requerirSesion()
   const a = await getAnalytics()
 
   const sortedChannels = Object.entries(a.channels).sort((x, y) => y[1].revenue - x[1].revenue)

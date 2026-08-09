@@ -6,6 +6,7 @@ import {
   IconLista, IconChat, IconAsistente, IconMano, IconCompra, IconFlecha,
 } from '@/components/icons'
 import PagosPorVerificar, { type PagoPorVerificar } from '@/components/PagosPorVerificar'
+import { requerirSesion } from '@/lib/supabase/requerirSesion'
 
 /**
  * Con Sofía atendiendo sola, lo primero que Rafael necesita al abrir el CRM
@@ -148,6 +149,8 @@ function hace(iso: string | null) {
 }
 
 export default async function DashboardPage() {
+  // Segunda cerradura: no depender solo del proxy (ver requerirSesion).
+  await requerirSesion()
   const m = await getMetrics()
 
   return (

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import BriefsClient, { type BriefFila } from './BriefsClient'
+import { requerirSesion } from '@/lib/supabase/requerirSesion'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,8 @@ export const dynamic = 'force-dynamic'
  * resto del chat. Acá es una ficha que se lee mientras se diseña.
  */
 export default async function BriefsPage() {
+  // Segunda cerradura: no depender solo del proxy (ver requerirSesion).
+  await requerirSesion()
   const supabase = await createClient()
 
   const { data, error } = await supabase
