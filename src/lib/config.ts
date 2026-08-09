@@ -17,28 +17,56 @@ export const WA_BASE = `https://wa.me/${WHATSAPP_NEGOCIO}`
 export const SITIO = 'https://tuwebgo.net'
 
 /**
- * Los tres trabajos que se le mandan a alguien que pide ver ejemplos.
+ * Los trabajos que se pueden mandar cuando alguien pide ver ejemplos.
  *
  * Son sitios REALES y en línea, no capturas ni maquetas. Esa es toda la
- * gracia: en un primer contacto en frío el cliente no está evaluando la
- * página, está evaluando si somos de verdad. Tres dominios que abren en un
- * toque resuelven esa pregunta más rápido que cualquier argumento.
+ * gracia: en un primer contacto en frío el cliente no está evaluando el
+ * diseño, está evaluando si existimos. Un dominio que abre en un toque
+ * resuelve esa pregunta más rápido que cualquier argumento.
  *
- * Van acá y no en el prompt porque son cadenas exactas. Sofía los tiene
- * descritos arriba para poder hablar de ellos, pero quien los ESCRIBE es el
- * código: un dominio con una letra cambiada es un 404, y un 404 en el mensaje
- * donde estamos demostrando que existimos es peor que no mandar nada.
+ * Las direcciones viven acá y no en el prompt porque son cadenas exactas.
+ * Sofía ELIGE cuáles pegan con el negocio del cliente; quien las ESCRIBE es
+ * el código. Un dominio con una letra cambiada es un 404, y un 404 en el
+ * mensaje donde estamos demostrando que somos reales prueba lo contrario.
+ * En las pruebas los mezclaba entre sí y salían "fortius.net" o "atryum.fit".
+ *
+ * Los siete verificados en línea el 2026-08-09 (todos 200). Ojo con MiloApp:
+ * es miloapp.fit, no milo.fit — ese segundo da 404.
  */
-export const PORTAFOLIO = [
-  'https://atryum.net',
-  'https://eluniversodefueguito.com',
-  'https://fortius.fit',
-] as const
+export const SITIOS = {
+  wuipi:    { nombre: 'Wuipi',    url: 'https://wuipi.net',                 que: 'plataforma digital' },
+  catemve:  { nombre: 'CATEMVE',  url: 'https://catemve.com',               que: 'sitio institucional' },
+  miloapp:  { nombre: 'MiloApp',  url: 'https://miloapp.fit',               que: 'landing de una app de fitness' },
+  proyben:  { nombre: 'Proyben',  url: 'https://proyben.com',               que: 'empresa de servicios, varias páginas' },
+  atryum:   { nombre: 'Atryum',   url: 'https://atryum.net',                que: 'app de condominios' },
+  fortius:  { nombre: 'Fortius',  url: 'https://fortius.fit',               que: 'entrenamiento personalizado' },
+  fueguito: { nombre: 'Fueguito', url: 'https://eluniversodefueguito.com',  que: 'marca infantil con tienda' },
+} as const
 
-/** Bloque listo para pegar al final de un mensaje de WhatsApp. */
-export const PORTAFOLIO_TEXTO =
-  `Estos son trabajos nuestros, échales un ojo:\n${PORTAFOLIO.join('\n')}\n\n` +
-  `Y acá está todo lo demás: ${SITIO}`
+export type ClaveSitio = keyof typeof SITIOS
+
+export const CLAVES_SITIOS = Object.keys(SITIOS) as ClaveSitio[]
+
+/** Si Sofía no eligió ninguno, estos tres: los más distintos entre sí. */
+const POR_DEFECTO: ClaveSitio[] = ['atryum', 'fueguito', 'fortius']
+
+/**
+ * Bloque listo para pegar al final de un mensaje de WhatsApp.
+ *
+ * Se topa en cuatro a propósito. Siete enlaces seguidos en un WhatsApp son
+ * una pared que nadie abre; tres o cuatro elegidos para ese negocio se ven
+ * como una recomendación.
+ */
+export function bloquePortafolio(claves: readonly string[] = []): string {
+  const validas = claves.filter((c): c is ClaveSitio => c in SITIOS)
+  const elegidas = [...new Set(validas.length ? validas : POR_DEFECTO)].slice(0, 4)
+
+  const lineas = elegidas.map((c) => `${SITIOS[c].nombre} — ${SITIOS[c].url}`)
+  return (
+    `Estos son trabajos nuestros, échales un ojo:\n${lineas.join('\n')}\n\n` +
+    `Y acá está todo lo demás: ${SITIO}`
+  )
+}
 
 /**
  * A qué etapa pasa el lead cuando Sofía detecta cada situación.

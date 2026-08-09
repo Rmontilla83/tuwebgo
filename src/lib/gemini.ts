@@ -16,7 +16,7 @@
  */
 
 import { bloquePagos, datosPagoTexto, STRIPE_LINK, ZELLE, PAGO_MOVIL } from '@/lib/pagos'
-import { PORTAFOLIO_TEXTO } from '@/lib/config'
+import { bloquePortafolio, CLAVES_SITIOS, SITIOS } from '@/lib/config'
 
 export const MODELO_POR_DEFECTO = 'gemini-2.5-flash'
 export const NOMBRE_BOT = 'Sofía'
@@ -51,10 +51,11 @@ debajo de 90. SEO desde el día 1 (meta tags, encabezados, datos estructurados,
 sitemap). Carga en menos de 2 segundos. Diseño primero para celular, porque el
 85% de los visitantes entra desde el teléfono.
 
-PORTAFOLIO (mencionar solo si lo piden, y solo estos)
-Wuipi (wuipi.net) · CATEMVE (catemve.com) · MiloApp (miloapp.fit) ·
-Proyben (proyben.com) · Atryum (atryum.net) · Fortius (fortius.fit) ·
-Universo de Fueguito (eluniversodefueguito.com)
+PORTAFOLIO — solo si lo piden
+${CLAVES_SITIOS.map((c) => `  ${c} = ${SITIOS[c].nombre}, ${SITIOS[c].que}`).join('\n')}
+
+Puedes nombrarlos y contar qué son. Las DIRECCIONES no las escribes tú nunca:
+pones las claves en enviar_portafolio y el sistema las pega exactas.
 `.trim()
 
 const CATALOGO = `
@@ -233,10 +234,9 @@ El mensaje que abrió la conversación lleva dos botones, y al final del texto
 que ves vas a encontrar la anotación "[Botones: ...]". Si el cliente responde
 con una de esas frases exactas, la tocó — no la escribió.
 
-- "Quiero ver ejemplos" → marca enviar_portafolio en true. El sistema pega
-  solo los tres sitios. Tú escribe apenas una línea de entrada, natural, y NO
-  copies ni inventes direcciones: van aparte y van bien.
-  Después de esa línea puedes preguntarle qué hace su negocio. Una sola
+- "Quiero ver ejemplos" → llena enviar_portafolio. Tú escribe apenas una línea
+  de entrada, natural, y NO copies ni inventes direcciones: van aparte y van
+  bien. Después de esa línea puedes preguntarle qué hace su negocio. Una sola
   pregunta, sin empujar hacia el pago todavía: acaba de tocar un botón por
   curiosidad, no pidió comprar nada.
 
@@ -245,6 +245,34 @@ con una de esas frases exactas, la tocó — no la escribió.
   que lo necesites, acá estamos." Y nada más. Insistirle a alguien que ya
   dijo que no es lo que hace que reporten el número, y el número es lo que no
   se puede reemplazar.
+
+CUÁNDO MANDAR TRABAJOS
+Siempre que los pida, y también cuando acompañen bien lo que estás diciendo:
+si pregunta cuánto cuesta, el precio con dos ejemplos al lado convence más
+que el precio solo.
+
+Nunca en dos casos: cuando dijo que no le interesa o se está despidiendo
+—ahí lo único que toca es cerrar bien—, y cuando ya reportó un pago, que es
+momento del formulario y de nada más.
+
+CUÁLES MANDAR
+De dos a cuatro, elegidos por parecido con SU negocio. Nunca los siete: siete
+enlaces seguidos son una pared que nadie abre, y mandar todo lo que uno tiene
+se lee como catálogo, no como recomendación.
+
+El parecido puede ser por rubro o por lo que el negocio necesita resolver:
+- Restaurante, posada, hotel, tienda → fueguito (marca con tienda), wuipi,
+  catemve.
+- Gimnasio, entrenador, salud, estética → fortius, miloapp.
+- Servicios profesionales, abogados, inmobiliarias, ferreterías,
+  talleres → proyben, catemve, wuipi.
+- Si te piden algo con sistema por dentro (reservas, pagos, usuarios) →
+  atryum.
+
+Si el cliente no dijo a qué se dedica y no lo puedes deducir, no adivines:
+manda tres variados y aprovecha para preguntarle qué hace.
+Al presentarlos, di en media línea qué es cada uno. "Un enlace pelado" no
+invita a abrir nada.
 
 MUY IMPORTANTE — QUÉ SIGNIFICA "MOSTRAR"
 Cuando alguien pide ver algo, lo que existe hoy y se puede mostrar YA son los
@@ -495,12 +523,15 @@ const ESQUEMA_RESPUESTA = {
         'No los escribas tú.',
     },
     enviar_portafolio: {
-      type: 'boolean',
+      type: 'array',
+      items: { type: 'string', enum: CLAVES_SITIOS },
       description:
-        'true si el cliente pidió ver ejemplos, trabajos, referencias o cómo ' +
-        'quedan las páginas — incluido cuando toca el botón "Quiero ver ' +
-        'ejemplos". El sistema agrega los sitios reales al final de tu ' +
-        'mensaje. No escribas tú ninguna dirección.',
+        'Los trabajos que hay que mandarle, elegidos por parecido con SU ' +
+        'negocio. Se llena cuando el cliente pide ver ejemplos, trabajos o ' +
+        'referencias — incluido cuando toca el botón "Quiero ver ejemplos". ' +
+        'De dos a cuatro claves, nunca las siete. Lista vacía en cualquier ' +
+        'otro caso. El sistema pega las direcciones al final de tu mensaje: ' +
+        'no escribas tú ninguna.',
     },
     handoff: {
       type: 'string',
@@ -631,19 +662,19 @@ export async function redactarBorrador(opts: {
   let quiereFormulario = false
   let quiereTarjeta = false
   let quiereDatosPago = false
-  let quierePortafolio = false
+  let sitiosPedidos: string[] = []
   try {
     const j = JSON.parse(crudo) as {
       mensaje?: string; handoff?: string
       enviar_formulario?: boolean; enviar_link_tarjeta?: boolean
-      enviar_datos_pago?: boolean; enviar_portafolio?: boolean
+      enviar_datos_pago?: boolean; enviar_portafolio?: string[]
     }
     if (j.mensaje) mensaje = j.mensaje
     if (j.handoff && j.handoff !== 'ninguno') handoff = j.handoff as MotivoHandoff
     quiereFormulario = j.enviar_formulario === true
     quiereTarjeta = j.enviar_link_tarjeta === true
     quiereDatosPago = j.enviar_datos_pago === true
-    quierePortafolio = j.enviar_portafolio === true
+    sitiosPedidos = Array.isArray(j.enviar_portafolio) ? j.enviar_portafolio : []
   } catch {
     // Si por lo que sea no vino JSON, usamos el texto tal cual y no hay handoff.
   }
@@ -682,12 +713,35 @@ export async function redactarBorrador(opts: {
   // mezclaba entre sí y salían cosas como "fortius.net" o "atryum.fit", que
   // no existen. Un enlace muerto en el mensaje donde estamos demostrando que
   // somos reales prueba justo lo contrario.
-  if (quierePortafolio && !texto.includes(PORTAFOLIO_TEXTO)) {
+  if (sitiosPedidos.length) {
     texto = texto
-      .replace(/https?:\/\/\S*(atryum|fueguito|fortius|tuwebgo|wuipi|catemve|miloapp|proyben)\S*/gi, '')
+      .replace(
+        /https?:\/\/\S*(atryum|fueguito|fortius|tuwebgo|wuipi|catemve|milo|proyben)\S*/gi,
+        ''
+      )
       .replace(/[ \t]+\n/g, '\n')
       .trim()
-    texto += `\n\n${PORTAFOLIO_TEXTO}`
+
+    // Si un trabajo ya se mandó en esta conversación, se manda otro.
+    //
+    // Probando contra Gemini de verdad salió que los adjunta con más ganas de
+    // lo que dice la regla: a "¿cuánto cuesta una página?" respondió el precio
+    // y encima dos ejemplos, 3 de 3 veces. Como venta está bien —eso hace
+    // cualquier vendedor— pero repetir los MISMOS enlaces cada dos mensajes es
+    // lo que delata a un robot. Mandando trabajos distintos, insistir juega a
+    // favor: cada vez enseña algo nuevo.
+    //
+    // Cuando ya se mandaron todos los que eligió, se repiten igual: eso pasa
+    // cuando el cliente pide de nuevo un enlace que perdió, y ahí negárselo
+    // sería absurdo.
+    const yaMandados = new Set(
+      opts.conversacion
+        .filter((t) => t.autor === 'rafael')
+        .flatMap((t) => CLAVES_SITIOS.filter((c) => t.texto.includes(SITIOS[c].url)))
+    )
+    const frescos = sitiosPedidos.filter((s) => !yaMandados.has(s as never))
+
+    texto += `\n\n${bloquePortafolio(frescos.length ? frescos : sitiosPedidos)}`
   }
 
   // Los datos de cobro, mismo principio que los enlaces. En las pruebas
