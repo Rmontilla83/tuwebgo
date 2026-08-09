@@ -188,7 +188,7 @@ export default async function DashboardPage() {
               <Link key={c.id} href="/dashboard/inbox"
                 className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-amber-100/60 transition-colors group">
                 <span className="text-sm font-semibold text-amber-950 truncate flex-1">
-                  {(c.leads as { name?: string } | null)?.name || c.display_name || 'Sin nombre'}
+                  {(c.leads as { name?: string; business_name?: string } | null)?.name || (c.leads as { business_name?: string } | null)?.business_name || c.display_name || 'Sin nombre'}
                 </span>
                 <span className="text-[11px] text-amber-800 flex-shrink-0 hidden sm:inline">{c.handoff_motivo}</span>
                 <span className="text-[11px] text-amber-700 font-mono flex-shrink-0">{hace(c.last_message_at)}</span>
@@ -363,7 +363,7 @@ export default async function DashboardPage() {
                 <div key={lead.id} className="bg-[var(--bg)] rounded-xl p-3.5 border border-[var(--border-light)]">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name || 'Sin nombre'}</p>
+                      <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name || lead.business_name || 'Sin nombre'}</p>
                       {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
                     </div>
                     <span className={`inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${STAGE_COLORS[lead.current_stage] ?? 'bg-gray-50 text-gray-500 border-gray-200'}`}>
@@ -386,7 +386,7 @@ export default async function DashboardPage() {
                 <tbody className="stagger">
                   {m.recentLeads.map((lead) => (
                     <tr key={lead.id} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-alt)]/50 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-[var(--dark)]">{lead.name || 'Sin nombre'}</td>
+                      <td className="py-3 px-3 font-semibold text-[var(--dark)]">{lead.name || lead.business_name || 'Sin nombre'}</td>
                       <td className="py-3 px-3 text-[var(--text-secondary)]">{lead.business_name || '—'}</td>
                       <td className="py-3 px-3"><CanalIcono canal={lead.source_channel} /></td>
                       <td className="py-3 px-3">

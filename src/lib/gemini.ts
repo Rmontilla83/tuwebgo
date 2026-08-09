@@ -208,6 +208,25 @@ cliente lo usa primero).
 Para cerrar un mensaje: "¿Te animas?", "¿Arrancamos?", "¿Te sirve así?",
 "¿Cómo lo ves?". Nunca "¿te parece bien que agendemos una llamada?".
 
+CUANDO NOSOTROS ESCRIBIMOS PRIMERO (respuesta a una campaña)
+Vas a ver un aviso al principio del contexto cuando la conversación la
+empezamos nosotros con una plantilla, no el cliente. Eso cambia el tono: esta
+persona NO nos buscó, le llegó un mensaje que no pidió.
+
+- Nada de "gracias por escribirnos" ni "qué bueno que nos contactas". Fuimos
+  nosotros los que aparecimos.
+- Si pregunta QUIÉN ERES o DE DÓNDE SACARON SU NÚMERO, la respuesta es una
+  sola y es la verdad: su negocio aparece en Google con su WhatsApp público, y
+  así lo encontramos. NO INVENTES OTRA COSA. Nunca digas que se registró, que
+  dejó sus datos, que viene de Instagram ni que pidió información: es mentira,
+  se nota, y es lo que hace que a uno lo reporten.
+- Si dice que no le interesa, que lo saquen o que no escriban más: acepta a la
+  primera, sin insistir ni contraofertar. "Listo, disculpa la molestia, no te
+  escribimos más." Una persona molesta que reporta el número nos cuesta mucho
+  más que una venta.
+- Si responde con interés, sigue normal: es una conversación como cualquier
+  otra a partir de ahí.
+
 SI EL CLIENTE MANDA UNA NOTA DE VOZ
 La vas a ver marcada como "(nota de voz)" seguida de lo que dijo, transcrito.
 Respóndele por texto, normal, sin hacer aspaviento de que era un audio y sin
@@ -289,6 +308,8 @@ export type ContextoLead = {
   montoCotizado?: number | null
   canal?: string | null
   refCode?: string | null
+  /** true si la conversación la abrimos nosotros con una plantilla de campaña. */
+  deCampana?: boolean
 }
 
 export type TurnoConversacion = {
@@ -366,6 +387,8 @@ export function construirPrompt(
   instruccionExtra?: string
 ): string {
   const ctx = [
+    // Va primero y en mayúsculas: cambia el tono de toda la respuesta.
+    lead.deCampana && '- ATENCIÓN: NOSOTROS le escribimos primero, por campaña. Esta persona NO nos buscó.',
     lead.nombre && `- Nombre: ${lead.nombre}`,
     lead.negocio && `- Negocio: ${lead.negocio}`,
     lead.etapa && `- Etapa: ${ETIQUETA_ETAPA[lead.etapa] ?? lead.etapa}`,

@@ -324,7 +324,7 @@ export default function PipelinePage() {
                       <div key={lead.id} draggable onDragStart={()=>setDraggedLead(lead.id)} onDragEnd={()=>{setDraggedLead(null);setDragOver(null)}} onClick={()=>setEditLead(lead)}
                         className={`bg-white rounded-xl p-3 border border-[var(--border-light)] shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.97] group ${draggedLead===lead.id?'opacity-30 scale-95':''} ${ROTTING_STYLES[rot]}`}>
                         <div className="flex items-start justify-between gap-1">
-                          <p className="font-semibold text-[13px] text-[var(--dark)] leading-snug truncate">{lead.name||'Sin nombre'}</p>
+                          <p className="font-semibold text-[13px] text-[var(--dark)] leading-snug truncate">{lead.name || lead.business_name || 'Sin nombre'}</p>
                           <span className={`text-[9px] flex-shrink-0 mt-0.5 ${ROTTING_BADGE[rot]}`}>{age.text}</span>
                         </div>
                         {lead.business_name && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
@@ -372,7 +372,7 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
     <div onClick={onClick} className={`bg-white rounded-xl p-4 border border-[var(--border-light)] shadow-sm active:scale-[0.98] transition-all cursor-pointer ${ROTTING_STYLES[rot]}`}>
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name||'Sin nombre'}</p>
+          <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name || lead.business_name || 'Sin nombre'}</p>
           {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
         </div>
         <span className={`text-[10px] flex-shrink-0 ${ROTTING_BADGE[rot]}`}>{age.text}</span>

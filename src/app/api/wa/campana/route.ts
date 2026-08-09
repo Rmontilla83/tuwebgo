@@ -4,6 +4,30 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { PLANTILLAS } from '@/lib/waTemplates'
 
 export const runtime = 'nodejs'
+
+/**
+ * Con qué se rellena el {{1}} de las plantillas ("Hola {{1}}, te escribimos…").
+ *
+ * Los contactos scrapeados NO traen nombre de persona: Google Maps da el
+ * nombre del negocio y nada más. Antes esto caía en `|| 'Hola'` y salía
+ * **"Hola Hola, te escribimos de TuWebGo"** — a los 173 contactos. Un saludo
+ * roto en el primer mensaje en frío es la forma más rápida de que te marquen
+ * como spam.
+ *
+ * Cuando no hay persona, "qué tal" completa la frase con naturalidad y la
+ * personalización real queda en {{2}}, que sí lleva el nombre del negocio y
+ * es lo que demuestra que no es un envío masivo ciego.
+ */
+function saludoDe(lead: { name?: string | null } | null): string {
+  const pila = (lead?.name ?? '').trim()
+  if (!pila) return 'qué tal'
+
+  const primero = pila.split(/\s+/)[0]
+  // Un "nombre" que en realidad es el negocio (viene así de algunas
+  // importaciones) tampoco sirve como saludo personal.
+  if (primero.length < 2 || primero.length > 20) return 'qué tal'
+  return primero
+}
 export const maxDuration = 60
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
@@ -99,10 +123,14 @@ export async function POST(request: Request) {
     }
 
     const params = plantilla.ejemplos.map((_, i) =>
-      i === 0
-        ? (lead?.name?.trim().split(/\s+/)[0] || 'Hola')
-        : (lead?.business_name?.trim() || 'tu negocio')
+      i === 0 ? saludoDe(lead) : (lead?.business_name?.trim() || 'tu negocio')
     )
+
+    // El texto REAL que va a recibir el cliente, con las variables ya puestas.
+    // Se guarda así y no como "[plantilla] param · param" porque ese marcador
+    // era ilegible para Rafael y, peor, Sofía lo veía como el mensaje previo:
+    // cuando el cliente respondía, ella no sabía qué le habíamos escrito.
+    const textoEnviado = plantilla.body.replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] ?? '')
 
     try {
       const { data: convId } = await db.rpc('wa_get_or_create_conversation', {
@@ -139,7 +167,7 @@ export async function POST(request: Request) {
         await db.from('wa_messages').insert({
           conversation_id: convId, wamid: wamid ?? null,
           direction: 'out', channel: 'cloud_api', msg_type: 'template',
-          body: `[${plantilla.name}] ${params.join(' · ')}`,
+          body: textoEnviado,
           template_name: plantilla.name, status: 'sent', sent_by: user.id,
         })
       }

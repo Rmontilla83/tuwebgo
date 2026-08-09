@@ -75,6 +75,19 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       .order('created_at', { ascending: false })
       .limit(20)
 
+    // ¿La conversación la abrimos nosotros? El primer mensaje de todos manda:
+    // si es una plantilla saliente, esta persona no nos buscó, le llegó algo
+    // que no pidió. Sofía tiene que saberlo o responde como si la hubieran
+    // contactado a ella — y ahí inventa cosas como "te escribimos porque
+    // dejaste tus datos".
+    const { data: primero } = await db
+      .from('wa_messages')
+      .select('direction, msg_type')
+      .eq('conversation_id', convId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+    const deCampana = primero?.[0]?.direction === 'out' && primero?.[0]?.msg_type === 'template'
+
     // OJO: copia antes de invertir. `.reverse()` MUTA el array, y `msgs` se
     // vuelve a usar más abajo para registrar el pago reportado. La primera
     // versión invertía en el lugar y el bloque de pago terminaba leyendo los
@@ -121,6 +134,7 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       lead: {
         nombre: lead.name, negocio: lead.business_name, etapa: lead.current_stage,
         plan: lead.plan_interested, montoCotizado: lead.amount_quoted, refCode: lead.ref_code,
+        deCampana,
       },
       conversacion: historial,
       enlaceFormulario,
