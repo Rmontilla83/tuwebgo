@@ -63,6 +63,7 @@ export const IconMano = (p: Props) => <Svg {...p} d="M7 11V5.5a1.5 1.5 0 013 0V1
 /* ── Acciones ── */
 export const IconCerrar = (p: Props) => <Svg {...p} d="M6 18L18 6M6 6l12 12" />
 export const IconCheck = (p: Props) => <Svg {...p} d="M4.5 12.5l5 5 10-11" />
+export const IconDescarga = (p: Props) => <Svg {...p} d="M12 3v11m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
 export const IconVolver = (p: Props) => <Svg {...p} d="M9 14l-4-4 4-4M5 10h9a5 5 0 010 10h-3" />
 export const IconError = (p: Props) => <Svg {...p} d="M15 9l-6 6M9 9l6 6M12 21a9 9 0 100-18 9 9 0 000 18z" />
 export const IconFlecha = (p: Props) => <Svg {...p} d="M5 12h14M13 6l6 6-6 6" />

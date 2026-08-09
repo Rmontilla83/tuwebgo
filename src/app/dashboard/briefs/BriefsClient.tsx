@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { IconChat, IconCheck, IconLista, IconFlecha } from '@/components/icons'
+import { IconChat, IconCheck, IconDescarga, IconLista, IconFlecha } from '@/components/icons'
 
 export type BriefFila = {
   id: number
@@ -74,7 +74,7 @@ const GRUPOS: { titulo: string; campos: [string, string][] }[] = [
     campos: [
       ['estilo', 'Sensación'],
       ['colores', 'Colores'],
-      ['referencia', 'Referencia'],
+      ['referencia', 'Página de referencia'],
     ],
   },
   {
@@ -97,6 +97,70 @@ function fecha(iso: string) {
   return new Date(iso).toLocaleString('es-VE', {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
+}
+
+/**
+ * El brief como documento Markdown.
+ *
+ * Es el formato que se lleva a la mesa de trabajo: se abre en cualquier
+ * editor, se pega en una nota, o se le da tal cual a una IA para generar el
+ * pre-diseño. Usa los mismos GRUPOS que la vista, así lo que se ve es lo que
+ * se descarga.
+ */
+function briefAMarkdown(f: BriefFila): string {
+  const lineas: string[] = [
+    `# Brief — ${f.negocio}`,
+    '',
+    `- **Recibido:** ${new Date(f.creado_at).toLocaleString('es-VE', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+  ]
+  if (f.contacto) lineas.push(`- **Contacto:** ${f.contacto}`)
+  if (f.telefono) lineas.push(`- **WhatsApp del lead:** ${f.telefono}`)
+
+  for (const g of GRUPOS) {
+    const items = g.campos
+      .map(([k, etq]) => [etq, texto(f.datos?.[k])] as const)
+      .filter(([, v]) => v)
+    if (!items.length) continue
+    lineas.push('', `## ${g.titulo}`, '')
+    for (const [etq, v] of items) {
+      // Ítems de lista y no líneas sueltas: en Markdown, líneas consecutivas
+      // sin separación se funden en un solo párrafo al renderizar.
+      if (v.includes('\n')) {
+        lineas.push(`- **${etq}:**`, ...v.split('\n').map((l) => `  ${l}`))
+      } else {
+        lineas.push(`- **${etq}:** ${v}`)
+      }
+    }
+  }
+
+  lineas.push('', '---', '', 'Generado desde el portal de TuWebGo.')
+  return lineas.join('\n')
+}
+
+/** Nombre de archivo seguro: "Panadería El Trigal" → brief-panaderia-el-trigal.md */
+function nombreArchivo(negocio: string): string {
+  const slug = negocio
+    .toLowerCase()
+    // NFD separa "í" en i + tilde combinante; el rango U+0300-036F borra las
+    // tildes sueltas. Escapes explícitos: un literal acá sobrevive mal a los
+    // editores y al control de versiones.
+    .normalize('NFD').replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+  return `brief-${slug || 'sin-nombre'}.md`
+}
+
+function descargarBrief(f: BriefFila) {
+  const blob = new Blob([briefAMarkdown(f)], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombreArchivo(f.negocio)
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
@@ -193,6 +257,14 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
                         Ir a la conversación
                       </Link>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => descargarBrief(f)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
+                    >
+                      <IconDescarga className="w-3.5 h-3.5" />
+                      Descargar .md
+                    </button>
                     <button
                       type="button"
                       onClick={() => alternarRevisado(f)}
