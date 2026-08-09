@@ -39,7 +39,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--dark)] flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-dvh bg-[var(--dark)] flex items-center justify-center p-6 relative overflow-hidden">
       {/* Background effects */}
       <div className="absolute inset-0 grain"></div>
       <div className="absolute top-[-200px] right-[-150px] w-[500px] h-[500px] rounded-full bg-[var(--primary-glow)] blur-[100px] animate-float opacity-60"></div>
@@ -73,7 +73,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.04] text-white text-sm focus:outline-none placeholder:text-white/20 transition-all duration-300"
+              className="w-full px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.04] text-white text-base sm:text-sm focus:outline-none placeholder:text-white/20 transition-all duration-300"
               placeholder="tu@email.com"
               required
             />
@@ -84,7 +84,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.04] text-white text-sm focus:outline-none placeholder:text-white/20 transition-all duration-300"
+              className="w-full px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.04] text-white text-base sm:text-sm focus:outline-none placeholder:text-white/20 transition-all duration-300"
               placeholder="••••••••"
               required
             />

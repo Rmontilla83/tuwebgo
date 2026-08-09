@@ -204,8 +204,8 @@ export default async function DashboardPage() {
         </div>
         <div className="grid grid-cols-3 gap-3">
           <Mini valor={m.msgsEntrantes} etiqueta="Recibidos" />
-          <Mini valor={m.msgsSofia} etiqueta="Respondió Sofía" destacado />
-          <Mini valor={m.msgsRafael} etiqueta="Respondiste tú" />
+          <Mini valor={m.msgsSofia} etiqueta="Sofía" destacado />
+          <Mini valor={m.msgsRafael} etiqueta="Tú" />
         </div>
         {m.msgsSofia + m.msgsRafael > 0 && (
           <p className="text-[11px] text-[var(--text-muted)] mt-3 pt-3 border-t border-[var(--border-light)]">

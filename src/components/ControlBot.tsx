@@ -59,7 +59,7 @@ export default function ControlBot() {
           role="switch"
           aria-checked={!!activo}
           aria-label={`Asistente ${NOMBRE_BOT}`}
-          className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
+          className={`relative w-12 h-7 rounded-full before:absolute before:-inset-2 before:content-[''] transition-colors flex-shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
             activo ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'
           }`}
         >

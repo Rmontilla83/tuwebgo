@@ -18,8 +18,8 @@ const NAV_ITEMS = [
 ]
 
 // Sidebar de escritorio: ahí sí entran Briefs y Config, hay espacio de sobra.
-// Briefs queda fuera del bottom bar a propósito — un brief se lee sentado,
-// mientras se diseña, no desde el teléfono. También se llega desde el lead.
+// En móvil, Briefs y Config viven como iconos en el header — el bottom bar ya
+// tiene sus 5 pestañas y no cabe una sexta con touch targets decentes.
 const NAV_DESKTOP = [
   ...NAV_ITEMS,
   { href: '/dashboard/briefs', label: 'Briefs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
@@ -129,13 +129,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* ── Mobile header (simplified - just logo + page context) ── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--dark)]/95 glass border-b border-white/[0.06] px-4 min-h-12 flex items-center justify-center safe-top">
-        {/* Config y Salir viven acá porque el bottom bar ya tiene sus 5 pestañas */}
-        <div className="absolute right-3 flex items-center gap-1">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--dark)]/95 glass border-b border-white/[0.06] px-4 min-h-12 flex items-center justify-center max-[380px]:justify-start max-[380px]:pl-3 safe-top">
+        {/* Briefs, Config y Salir viven acá porque el bottom bar ya tiene sus
+            5 pestañas. Briefs sin esto quedaba INALCANZABLE en móvil: solo
+            estaba en el sidebar de escritorio. */}
+        <div className="absolute right-2 flex items-center gap-1.5">
+          <Link
+            href="/dashboard/briefs"
+            aria-label="Briefs"
+            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${pathname.startsWith('/dashboard/briefs') ? 'text-white bg-white/10' : 'text-white/40 active:text-white/70'}`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </Link>
           <Link
             href="/dashboard/settings"
             aria-label="Configuración"
-            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${pathname.startsWith('/dashboard/settings') ? 'text-white bg-white/10' : 'text-white/40 active:text-white/70'}`}
+            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${pathname.startsWith('/dashboard/settings') ? 'text-white bg-white/10' : 'text-white/40 active:text-white/70'}`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
               <path d={ICON_CONFIG} />
@@ -144,7 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             onClick={handleLogout}
             aria-label="Salir"
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/40 active:text-white/70 cursor-pointer"
+            className="w-10 h-10 ml-1.5 flex items-center justify-center rounded-lg text-white/40 active:text-white/70 cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

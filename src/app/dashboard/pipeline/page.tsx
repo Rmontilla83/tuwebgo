@@ -372,8 +372,8 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
     <div onClick={onClick} className={`bg-white rounded-xl p-4 border border-[var(--border-light)] shadow-sm active:scale-[0.98] transition-all cursor-pointer ${ROTTING_STYLES[rot]}`}>
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm text-[var(--dark)]">{lead.name||'Sin nombre'}</p>
-          {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5">{lead.business_name}</p>}
+          <p className="font-semibold text-sm text-[var(--dark)] truncate">{lead.name||'Sin nombre'}</p>
+          {lead.business_name && <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{lead.business_name}</p>}
         </div>
         <span className={`text-[10px] flex-shrink-0 ${ROTTING_BADGE[rot]}`}>{age.text}</span>
       </div>
@@ -391,7 +391,7 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
             onClick={(e) => e.stopPropagation()}
             title="Abrir la conversación en Inbox"
             aria-label={`Abrir conversación con ${lead.name || 'el lead'}`}
-            className="ml-auto w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center hover:brightness-110 active:scale-95 transition-all cursor-pointer flex-shrink-0"
+            className="ml-auto w-10 h-10 rounded-lg bg-emerald-500 text-white flex items-center justify-center hover:brightness-110 active:scale-95 transition-all cursor-pointer flex-shrink-0"
           >
             <IconWhatsApp className="w-4 h-4" />
           </Link>
@@ -530,7 +530,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
           <div className="flex gap-2">
             <select value={noteType} onChange={e=>setNoteType(e.target.value)} className="px-2 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm w-28">{Object.entries(ACTIVITY_LABELS).filter(([k])=>!['stage_change','system'].includes(k)).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
             <input type="text" value={newNote} onChange={e=>setNewNote(e.target.value)} placeholder="Agregar nota rápida..." onKeyDown={e=>{if(e.key==='Enter')addNote()}}
-              className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)]" />
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-base sm:text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)]" />
             <button onClick={addNote} disabled={!newNote.trim()} className="px-3 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-semibold disabled:opacity-40 cursor-pointer">+</button>
           </div>
 
@@ -554,7 +554,7 @@ function EditLeadModal({ lead, stages, supabase, onClose, onSave, onDelete }: {
                       <span className="font-semibold text-[var(--primary)]">{stages.find(s=>s.slug===(item.data as Transition).to_stage)?.label}</span>
                     </p>
                   ) : (
-                    <p className="text-xs text-[var(--dark)]">{(item.data as Activity).content}</p>
+                    <p className="text-xs text-[var(--dark)] break-words">{(item.data as Activity).content}</p>
                   )}
                   <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{timeAgo(item.date)} — {new Date(item.date).toLocaleString('es-VE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
                 </div>
@@ -577,7 +577,7 @@ function Modal({title,icon,onClose,children}:{title:string;icon?:React.ReactNode
         <div className="flex min-h-full items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl animate-fade-in-scale border border-[var(--border-light)]" style={{pointerEvents:'auto'}} onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)]">
-              <div className="flex items-center gap-2.5">{icon&&<span className="text-xl">{icon}</span>}<h2 className="font-bold text-lg text-[var(--dark)] font-[family-name:var(--font-display)]">{title}</h2></div>
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">{icon&&<span className="text-xl">{icon}</span>}<h2 className="font-bold text-lg text-[var(--dark)] font-[family-name:var(--font-display)] truncate">{title}</h2></div>
               <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--dark)] cursor-pointer p-1.5 rounded-lg hover:bg-[var(--bg-alt)]"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div className="p-5">{children}</div>

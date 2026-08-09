@@ -67,7 +67,7 @@ function NotaDeVoz({ path }: { path: string }) {
   return (
     <button
       type="button" onClick={abrir} disabled={cargando}
-      className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg border border-current/25 hover:bg-current/10 disabled:opacity-50"
+      className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg border border-current/25 hover:bg-current/10 disabled:opacity-50"
     >
       <IconTelefono className="w-3 h-3" />
       {cargando ? 'Cargando…' : 'Escuchar'}
@@ -485,7 +485,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
       )}
 
 
-      <div className="grid lg:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-280px)] min-h-[420px]">
+      <div className="grid lg:grid-cols-[320px_1fr] gap-4 h-[calc(100dvh-280px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-[420px]">
         {/* ── Lista ── */}
         <div className={`bg-[var(--card)] rounded-2xl border border-[var(--border)] flex-col overflow-hidden ${activa ? 'hidden lg:flex' : 'flex'}`}>
           <div className="p-3 border-b border-[var(--border-light)] space-y-2">
@@ -493,7 +493,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar conversación..."
-              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)]"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-base sm:text-sm text-[var(--dark)] placeholder:text-[var(--text-muted)]"
             />
             {pendientesHumano > 0 && (
               <button
@@ -562,7 +562,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
           ) : (
             <>
               <div className="px-4 py-3 border-b border-[var(--border-light)] flex items-center gap-3">
-                <button onClick={() => setActiva(null)} className="lg:hidden text-[var(--text-muted)] cursor-pointer text-lg" aria-label="Volver"><IconFlecha className="w-5 h-5 rotate-180" /></button>
+                <button onClick={() => setActiva(null)} className="lg:hidden w-10 h-10 -ml-2 flex items-center justify-center text-[var(--text-muted)] cursor-pointer" aria-label="Volver"><IconFlecha className="w-5 h-5 rotate-180" /></button>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-sm text-[var(--dark)] truncate">
                     {conv.leads?.name || conv.display_name || formatPhoneVE(conv.phone_e164)}
@@ -604,7 +604,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                       <button
                         key={e.slug}
                         onClick={() => cambiarEtapa(e.slug)}
-                        className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                        className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
                           activa
                             ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
                             : 'bg-[var(--bg-alt)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--primary)]/40'
@@ -639,8 +639,8 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                      lo cobró: pintarlo como burbuja haría creer que lo mandó
                      el cliente. Va centrado y apagado, como una marca de agua. */
                   <div key={m.id} className="flex justify-center py-1">
-                    <span className="text-[11px] text-[var(--text-muted)] bg-[var(--card)] border border-[var(--border-light)] rounded-full px-3 py-1 inline-flex items-center gap-1.5">
-                      <IconLista className="w-3 h-3" />
+                    <span className="text-[11px] text-[var(--text-muted)] bg-[var(--card)] border border-[var(--border-light)] rounded-2xl px-3 py-1 inline-flex flex-wrap justify-center items-center gap-1.5 max-w-[88%] break-words">
+                      <IconLista className="w-3 h-3 flex-shrink-0" />
                       {m.body}
                       <Link href="/dashboard/briefs" className="font-semibold text-[var(--primary)] hover:underline">Verlo</Link>
                     </span>
@@ -700,7 +700,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                           onClick={() => enviarPlantilla(p)}
                           disabled={enviando}
                           title={previsualizar(p)}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 cursor-pointer transition-all"
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-amber-300 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 cursor-pointer transition-all"
                         >
                           {p.proposito}
                         </button>
@@ -717,7 +717,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                     onClick={sugerir}
                     disabled={redactando}
                     title="Gemini redacta el borrador con el contexto del lead y la conversación. Lo revisas y lo mandas tú."
-                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--primary)] text-white text-[11px] font-semibold hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-all"
+                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--primary)] text-white text-[11px] font-semibold hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-all"
                   >
                     {redactando ? (
                       <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />Redactando…</>
@@ -743,7 +743,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) enviar() }}
                     rows={2}
                     placeholder="Escribe un mensaje... (Ctrl+Enter para enviar)"
-                    className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--dark)] resize-none placeholder:text-[var(--text-muted)]"
+                    className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-base sm:text-sm text-[var(--dark)] resize-none placeholder:text-[var(--text-muted)]"
                   />
                   <button
                     onClick={enviar}

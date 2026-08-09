@@ -199,10 +199,10 @@ export default async function AnalyticsPage() {
                   {sortedChannels.map(([ch, data]) => (
                     <div key={ch} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0 bg-[var(--bg)] sm:bg-transparent rounded-xl sm:rounded-none p-3 sm:p-0">
                       <span className="text-sm text-[var(--dark)] font-semibold sm:font-medium sm:w-32">{SOURCE_LABELS[ch] || ch}</span>
-                      <div className="flex gap-3 sm:gap-4 text-xs text-[var(--text-secondary)]">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 sm:gap-4 text-xs text-[var(--text-secondary)]">
                         <span>{data.leads} leads</span>
                         <span>{data.won} ventas</span>
-                        <span className="font-bold text-[var(--green)]">${data.revenue}</span>
+                        <span className="font-bold text-[var(--green)]">${Math.round(Number(data.revenue))}</span>
                         <span>{data.leads > 0 ? ((data.won / data.leads) * 100).toFixed(0) : 0}%</span>
                       </div>
                     </div>
@@ -311,9 +311,9 @@ export default async function AnalyticsPage() {
               ) : (
                 <div className="space-y-3">
                   {Object.entries(a.utmSources).sort((x, y) => y[1] - x[1]).map(([source, count]) => (
-                    <div key={source} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[var(--dark)]">{source}</span>
-                      <span className="text-sm font-bold text-[var(--text-secondary)]">{count} sesiones</span>
+                    <div key={source} className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-[var(--dark)] min-w-0 flex-1 truncate">{source}</span>
+                      <span className="text-sm font-bold text-[var(--text-secondary)] shrink-0 whitespace-nowrap">{count} sesiones</span>
                     </div>
                   ))}
                 </div>

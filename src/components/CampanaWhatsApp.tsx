@@ -242,7 +242,7 @@ export default function CampanaWhatsApp() {
                 <button
                   onClick={() => lanzar(c.campaign_id)}
                   disabled={enviando !== null || cupoRestante === 0 || salud?.seguroEnviar === false}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 transition-all"
+                  className="px-4 py-3 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 transition-all"
                 >
                   {enviando === c.campaign_id ? 'Enviando…' : salud?.seguroEnviar === false ? 'Envío bloqueado' : `Enviar ${Math.min(c.pendientes, cupoRestante)}`}
                 </button>

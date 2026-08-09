@@ -185,7 +185,7 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
 
   if (!filas.length) {
     return (
-      <div className="p-6 max-w-3xl">
+      <div className="max-w-3xl">
         <h1 className="text-xl font-bold mb-1">Briefs</h1>
         <p className="text-sm text-[var(--text-secondary)] mb-6">
           Lo que los clientes responden en el formulario del pre-diseño.
@@ -203,7 +203,7 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl">
+    <div className="max-w-3xl">
       <h1 className="text-xl font-bold mb-1">Briefs</h1>
       <p className="text-sm text-[var(--text-secondary)] mb-5">
         {filas.length} {filas.length === 1 ? 'recibido' : 'recibidos'}
@@ -251,7 +251,7 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
                     {f.conversation_id && (
                       <Link
                         href={`/dashboard/inbox?conv=${f.conversation_id}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
                       >
                         <IconChat className="w-3.5 h-3.5" />
                         Ir a la conversación
@@ -260,7 +260,7 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
                     <button
                       type="button"
                       onClick={() => descargarBrief(f)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
                     >
                       <IconDescarga className="w-3.5 h-3.5" />
                       Descargar .md
@@ -268,7 +268,7 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
                     <button
                       type="button"
                       onClick={() => alternarRevisado(f)}
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border ${
                         f.revisado
                           ? 'border-[var(--border-light)] text-[var(--text-secondary)]'
                           : 'border-green-300 bg-green-50 text-green-800'

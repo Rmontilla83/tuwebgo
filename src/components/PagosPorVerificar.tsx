@@ -110,11 +110,11 @@ export default function PagosPorVerificar({ pagos }: { pagos: PagoPorVerificar[]
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2.5">
               {p.conversation_id && (
                 <Link
                   href={`/dashboard/inbox?conv=${p.conversation_id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border border-[var(--border-light)] hover:bg-[var(--card-hover)]"
                 >
                   <IconChat className="w-3.5 h-3.5" />
                   Ver el comprobante
@@ -124,7 +124,7 @@ export default function PagosPorVerificar({ pagos }: { pagos: PagoPorVerificar[]
                 type="button"
                 disabled={ocupado === p.id}
                 onClick={() => resolver(p, true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 <IconCheck className="w-3.5 h-3.5" />
                 {ocupado === p.id ? 'Guardando…' : 'Sí entró'}
@@ -133,7 +133,7 @@ export default function PagosPorVerificar({ pagos }: { pagos: PagoPorVerificar[]
                 type="button"
                 disabled={ocupado === p.id}
                 onClick={() => resolver(p, false)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-[var(--card-hover)] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-[var(--card-hover)] disabled:opacity-50"
               >
                 <IconCerrar className="w-3.5 h-3.5" />
                 No aparece

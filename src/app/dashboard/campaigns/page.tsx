@@ -204,16 +204,16 @@ export default function CampaignsPage() {
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setShowExpense(c.id)} className="px-3 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer active:scale-[0.97]">
+                      <button onClick={() => setShowExpense(c.id)} className="px-3 py-2.5 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer active:scale-[0.97]">
                         + Gasto
                       </button>
-                      <button onClick={() => setEditCampaign(c)} className="px-3 py-2 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer active:scale-[0.97]">
+                      <button onClick={() => setEditCampaign(c)} className="px-3 py-2.5 rounded-lg text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-alt)] transition-all cursor-pointer active:scale-[0.97]">
                         Editar
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
                     <MetricBox label="Gasto" value={`$${m2.total_spend.toFixed(0)}`} />
                     <MetricBox label="Leads" value={m2.total_leads.toString()} />
                     <MetricBox label="Ventas" value={m2.won_leads.toString()} />
@@ -283,7 +283,7 @@ export default function CampaignsPage() {
 function MetricBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-[var(--bg)] rounded-xl p-2 sm:p-3 text-center">
-      <p className="text-[8px] sm:text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
+      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
       <p className={`text-sm sm:text-lg font-bold ${color || 'text-[var(--dark)]'} mt-0.5 font-[family-name:var(--font-display)]`}>{value}</p>
     </div>
   )
@@ -460,7 +460,7 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">Link landing</p>
-              <button onClick={() => copy(landingUrl, 'landing')} className="px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white text-[10px] font-semibold cursor-pointer active:scale-[0.95]">
+              <button onClick={() => copy(landingUrl, 'landing')} className="px-4 py-2.5 rounded-lg bg-[var(--primary)] text-white text-xs font-semibold cursor-pointer active:scale-[0.95]">
                 {copied === 'landing' ? <span className="inline-flex items-center gap-1"><IconCheck className="w-3 h-3" />Copiado</span> : 'Copiar'}
               </button>
             </div>
@@ -469,7 +469,7 @@ function UtmGeneratorModal({ onClose }: { onClose: () => void }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs font-bold text-[var(--text-secondary)] uppercase">WhatsApp directo</p>
-              <button onClick={() => copy(waUrl, 'wa')} className="px-3 py-1.5 rounded-lg bg-[var(--green-wa)] text-white text-[10px] font-semibold cursor-pointer active:scale-[0.95]">
+              <button onClick={() => copy(waUrl, 'wa')} className="px-4 py-2.5 rounded-lg bg-[var(--green-wa)] text-white text-xs font-semibold cursor-pointer active:scale-[0.95]">
                 {copied === 'wa' ? <span className="inline-flex items-center gap-1"><IconCheck className="w-3 h-3" />Copiado</span> : 'Copiar'}
               </button>
             </div>

@@ -73,7 +73,7 @@ export default function PlantillasWA() {
         </div>
       )}
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button
           onClick={subir}
           disabled={subiendo}
@@ -135,12 +135,12 @@ export default function PlantillasWA() {
                 onClick={() => setAbierta(abierto ? null : p.name)}
                 className="w-full text-left px-3.5 py-3 hover:bg-[var(--bg-alt)] transition-colors cursor-pointer"
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--dark)] font-mono truncate">{p.name}</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">{p.proposito}</p>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto sm:flex-shrink-0">
                     <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${
                       p.category === 'MARKETING'
                         ? 'bg-amber-50 text-amber-700 border-amber-200'
