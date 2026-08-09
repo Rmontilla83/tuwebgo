@@ -153,6 +153,11 @@ export default function CampanaWhatsApp() {
         setAvance(`${total} enviados${fallos ? `, ${fallos} fallidos` : ''}${d.restantes ? ` · ${d.restantes} en cola` : ''}`)
 
         if (d.cupoAgotado) { setAvance(`${total} enviados. ${d.mensaje}`); break }
+
+        // Va como error rojo y no como avance: sin eso el corte por
+        // configuración terminaba mostrando "Listo: 0 enviados", que se lee
+        // como que ya no quedaba nadie a quien escribirle.
+        if (d.detenida) { setError(d.mensaje); setAvance(`${total} enviados antes de parar.`); break }
         if (d.terminada || d.enviados === 0) { setAvance(`Listo: ${total} enviados${fallos ? `, ${fallos} fallidos` : ''}.`); break }
       }
       await cargar()

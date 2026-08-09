@@ -179,6 +179,29 @@ export async function POST(request: Request) {
 
   let enviados = 0, fallidos = 0
 
+  /**
+   * Freno para cuando lo que falla es la configuración, no el contacto.
+   *
+   * Un error sistemático —plantilla todavía sin aprobar, idioma que no
+   * coincide, token vencido, cantidad de variables equivocada— le pasa
+   * idéntico a los 173. Y como el bucle solo cortaba por límite de Meta,
+   * seguía de largo marcando 'fallido' uno por uno; el siguiente lote consulta
+   * `estado = 'pendiente'`, así que un contacto marcado así NO se reintenta
+   * nunca. Un token mal copiado quemaba la lista entera en dos tandas, y
+   * desde el panel solo se veía "40 fallidos".
+   *
+   * Tres errores idénticos seguidos no son casualidad: es la configuración.
+   * Ahí se para y esos tres vuelven a 'pendiente' — no se pierde ninguno, y
+   * arreglando lo que sea el envío sigue donde quedó.
+   *
+   * Se comparan los textos de error: dos números inválidos distintos dan
+   * mensajes distintos, una plantilla sin aprobar da siempre el mismo.
+   */
+  let ultimoError: string | null = null
+  let seguidos = 0
+  let idsSeguidos: string[] = []
+  let errorSistematico: string | null = null
+
   // Secuencial y no en paralelo: Meta limita por segundo y en paralelo devuelve
   // errores de rate limit que parecen rechazos de contenido.
   for (const t of targets) {
@@ -229,14 +252,39 @@ export async function POST(request: Request) {
       const datos = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        const detalle = datos?.error?.error_user_msg ?? datos?.error?.message ?? `HTTP ${res.status}`
+        const detalle: string = datos?.error?.error_user_msg ?? datos?.error?.message ?? `HTTP ${res.status}`
         await db.from('campaign_targets').update({ estado: 'fallido', error: detalle.slice(0, 300) }).eq('id', t.id)
         fallidos++
+
+        if (detalle === ultimoError) { seguidos++; idsSeguidos.push(t.id) }
+        else { ultimoError = detalle; seguidos = 1; idsSeguidos = [t.id] }
+
         // Si Meta corta por límite, no seguimos golpeando: el resto queda
-        // pendiente para la próxima tanda.
-        if (/rate|limit|too many/i.test(detalle)) break
+        // pendiente para la próxima tanda. Y este también vuelve a la cola —
+        // que Meta nos frene a nosotros no es un defecto de su número, y
+        // dejarlo en 'fallido' lo sacaba del reparto para siempre.
+        if (/rate|limit|too many/i.test(detalle)) {
+          await db.from('campaign_targets').update({ estado: 'pendiente' }).eq('id', t.id)
+          fallidos--
+          break
+        }
+
+        if (seguidos >= 3) {
+          // Devueltos a la cola: el problema no era de ellos.
+          await db.from('campaign_targets')
+            .update({ estado: 'pendiente' })
+            .in('id', idsSeguidos)
+          fallidos -= idsSeguidos.length
+          errorSistematico = detalle
+          break
+        }
         continue
       }
+
+      // Un envío bueno limpia la racha: lo anterior era de ese contacto.
+      ultimoError = null
+      seguidos = 0
+      idsSeguidos = []
 
       const wamid: string | undefined = datos?.messages?.[0]?.id
 
@@ -274,7 +322,17 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true, enviados, fallidos,
     restantes: restantes ?? 0,
-    terminada: (restantes ?? 0) === 0,
+    // Un corte por configuración NO es "terminada": queda gente en la cola.
+    terminada: !errorSistematico && (restantes ?? 0) === 0,
     cupoRestante: Math.max(0, cupo - enviados),
+    ...(errorSistematico
+      ? {
+          detenida: true,
+          mensaje:
+            `Se detuvo el envío: los últimos 3 intentos fallaron igual, así que ` +
+            `el problema es de configuración y no de los contactos. Nadie se ` +
+            `quemó, siguen en la cola. Meta dijo: "${errorSistematico}"`,
+        }
+      : {}),
   })
 }
