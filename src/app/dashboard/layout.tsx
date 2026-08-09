@@ -1,9 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useInboxAlerts } from '@/lib/useInboxAlerts'
+import { useAvisoAtencion } from '@/lib/useAvisoAtencion'
+import AvisoSonoro from '@/components/AvisoSonoro'
 
 const ICON_CONFIG = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
 
@@ -50,6 +53,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Lo que espera a un humano manda sobre lo simplemente no leído.
   const alertaInbox = requierenHumano > 0 ? requierenHumano : sinLeer
   const alertaUrgente = requierenHumano > 0
+
+  // Vive en el layout y no en el Inbox a propósito: el aviso tiene que sonar
+  // estés donde estés dentro del portal, incluso con la ventana minimizada.
+  const [avisoActivo, setAvisoActivo] = useState(false)
+  useAvisoAtencion({ requierenHumano, sinLeer, activo: avisoActivo })
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -116,6 +124,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Bottom section */}
         <div className="p-3 mt-auto">
           <div className="mx-1 mb-3 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+          {/* El aviso sonoro vive acá abajo, a la vista pero sin competir con
+              la navegación. Hay que encenderlo en cada sesión: el navegador
+              no permite audio sin un clic previo. */}
+          <div className="px-1 mb-3">
+            <AvisoSonoro onCambio={setAvisoActivo} />
+          </div>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[family-name:var(--font-display)] text-white/30 hover:text-white/70 hover:bg-white/[0.04] transition-all duration-300 w-full cursor-pointer"
@@ -133,6 +147,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Briefs, Config y Salir viven acá porque el bottom bar ya tiene sus
             5 pestañas. Briefs sin esto quedaba INALCANZABLE en móvil: solo
             estaba en el sidebar de escritorio. */}
+        {/* En móvil va a la izquierda: es el único control que hay que tocar
+            al empezar la jornada, y a la derecha compite con Salir. */}
+        <div className="absolute left-2 scale-90 origin-left">
+          <AvisoSonoro onCambio={setAvisoActivo} />
+        </div>
         <div className="absolute right-2 flex items-center gap-1.5">
           <Link
             href="/dashboard/briefs"
