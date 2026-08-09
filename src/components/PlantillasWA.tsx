@@ -165,6 +165,21 @@ export default function PlantillasWA() {
                     <p className="text-sm whitespace-pre-wrap">{previsualizar(p)}</p>
                     {p.footer && <p className="text-[10px] text-white/60 mt-1.5">{p.footer}</p>}
                   </div>
+                  {/* Los botones se dibujan debajo de la burbuja, como en
+                      WhatsApp: son parte de lo que va a ver el cliente y
+                      aprobarlos a ciegas es pedir un rechazo de Meta. */}
+                  {p.botones?.length ? (
+                    <div className="max-w-[85%] mt-0.5 space-y-0.5">
+                      {p.botones.map((b) => (
+                        <div
+                          key={b}
+                          className="bg-[var(--bg)] border border-[var(--border)] rounded-lg py-1.5 text-center text-[13px] font-medium text-emerald-600"
+                        >
+                          {b}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {est?.rejected_reason && (
                     <p className="text-xs text-red-600 mt-2">Motivo del rechazo: {est.rejected_reason}</p>
                   )}

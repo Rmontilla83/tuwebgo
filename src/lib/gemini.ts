@@ -16,6 +16,7 @@
  */
 
 import { bloquePagos, datosPagoTexto, STRIPE_LINK, ZELLE, PAGO_MOVIL } from '@/lib/pagos'
+import { PORTAFOLIO_TEXTO } from '@/lib/config'
 
 export const MODELO_POR_DEFECTO = 'gemini-2.5-flash'
 export const NOMBRE_BOT = 'Sofía'
@@ -226,6 +227,32 @@ persona NO nos buscó, le llegó un mensaje que no pidió.
   más que una venta.
 - Si responde con interés, sigue normal: es una conversación como cualquier
   otra a partir de ahí.
+
+LOS BOTONES DE LA PLANTILLA DE PRIMER CONTACTO
+El mensaje que abrió la conversación lleva dos botones, y al final del texto
+que ves vas a encontrar la anotación "[Botones: ...]". Si el cliente responde
+con una de esas frases exactas, la tocó — no la escribió.
+
+- "Quiero ver ejemplos" → marca enviar_portafolio en true. El sistema pega
+  solo los tres sitios. Tú escribe apenas una línea de entrada, natural, y NO
+  copies ni inventes direcciones: van aparte y van bien.
+  Después de esa línea puedes preguntarle qué hace su negocio. Una sola
+  pregunta, sin empujar hacia el pago todavía: acaba de tocar un botón por
+  curiosidad, no pidió comprar nada.
+
+- "No, gracias" → cierra a la primera, en una sola línea, sin contraofertas ni
+  "¿y si te muestro…?". Algo como "Listo, gracias por avisar. Cualquier día
+  que lo necesites, acá estamos." Y nada más. Insistirle a alguien que ya
+  dijo que no es lo que hace que reporten el número, y el número es lo que no
+  se puede reemplazar.
+
+MUY IMPORTANTE — QUÉ SIGNIFICA "MOSTRAR"
+Cuando alguien pide ver algo, lo que existe hoy y se puede mostrar YA son los
+trabajos que ya hicimos. Su página todavía no existe: hacerla cuesta $50 y
+tarda 48 horas. Nunca ofrezcas "te muestro cómo quedaría tu página" como si
+fuera gratis e inmediato, porque después hay que salir con un precio y eso se
+siente como una trampa. Se dice completo desde el principio: te muestro
+trabajos nuestros ahora, y la tuya la ves en 48 horas por $50 con devolución.
 
 SI EL CLIENTE MANDA UNA NOTA DE VOZ
 La vas a ver marcada como "(nota de voz)" seguida de lo que dijo, transcrito.
@@ -467,6 +494,14 @@ const ESQUEMA_RESPUESTA = {
         'completos (Zelle, pago móvil, Binance y el monto en bolívares del día). ' +
         'No los escribas tú.',
     },
+    enviar_portafolio: {
+      type: 'boolean',
+      description:
+        'true si el cliente pidió ver ejemplos, trabajos, referencias o cómo ' +
+        'quedan las páginas — incluido cuando toca el botón "Quiero ver ' +
+        'ejemplos". El sistema agrega los sitios reales al final de tu ' +
+        'mensaje. No escribas tú ninguna dirección.',
+    },
     handoff: {
       type: 'string',
       enum: ['ninguno', 'quiere_comprar', 'pago_reportado', 'queja', 'fuera_de_alcance', 'pide_humano'],
@@ -596,17 +631,19 @@ export async function redactarBorrador(opts: {
   let quiereFormulario = false
   let quiereTarjeta = false
   let quiereDatosPago = false
+  let quierePortafolio = false
   try {
     const j = JSON.parse(crudo) as {
       mensaje?: string; handoff?: string
       enviar_formulario?: boolean; enviar_link_tarjeta?: boolean
-      enviar_datos_pago?: boolean
+      enviar_datos_pago?: boolean; enviar_portafolio?: boolean
     }
     if (j.mensaje) mensaje = j.mensaje
     if (j.handoff && j.handoff !== 'ninguno') handoff = j.handoff as MotivoHandoff
     quiereFormulario = j.enviar_formulario === true
     quiereTarjeta = j.enviar_link_tarjeta === true
     quiereDatosPago = j.enviar_datos_pago === true
+    quierePortafolio = j.enviar_portafolio === true
   } catch {
     // Si por lo que sea no vino JSON, usamos el texto tal cual y no hay handoff.
   }
@@ -638,6 +675,20 @@ export async function redactarBorrador(opts: {
     /https?:\/\/\S*brief\.html\S*/gi
   )
   adjuntar(quiereTarjeta, STRIPE_LINK || undefined, /https?:\/\/\S*buy\.stripe\.com\S*/gi)
+
+  // El portafolio es lo primero que ve alguien que nunca oyó hablar de
+  // TuWebGo, así que vale doble que llegue exacto. Se le borra al modelo
+  // cualquier dominio nuestro que haya escrito de memoria: en las pruebas los
+  // mezclaba entre sí y salían cosas como "fortius.net" o "atryum.fit", que
+  // no existen. Un enlace muerto en el mensaje donde estamos demostrando que
+  // somos reales prueba justo lo contrario.
+  if (quierePortafolio && !texto.includes(PORTAFOLIO_TEXTO)) {
+    texto = texto
+      .replace(/https?:\/\/\S*(atryum|fueguito|fortius|tuwebgo|wuipi|catemve|miloapp|proyben)\S*/gi, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .trim()
+    texto += `\n\n${PORTAFOLIO_TEXTO}`
+  }
 
   // Los datos de cobro, mismo principio que los enlaces. En las pruebas
   // end-to-end, una de cada tres veces el modelo daba solo el Zelle y se comía

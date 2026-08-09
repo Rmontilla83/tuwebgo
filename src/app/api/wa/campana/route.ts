@@ -28,6 +28,73 @@ function saludoDe(lead: { name?: string | null } | null): string {
   if (primero.length < 2 || primero.length > 20) return 'qué tal'
   return primero
 }
+
+type LeadCampana = {
+  name?: string | null
+  business_name?: string | null
+  phone_e164?: string | null
+  ciudad?: string | null
+  notes?: string | null
+}
+
+/**
+ * El {{3}}: la prueba de que miramos su negocio y no una lista.
+ *
+ * En un WhatsApp en frío la pregunta que el cliente se hace antes que
+ * cualquier otra es "¿de dónde sacaste mi número?". Si no la respondemos, la
+ * responde él solo y la respuesta que se inventa siempre es peor. Un dato
+ * concreto y comprobable de SU ficha de Google la cierra de una: nadie cree
+ * que un envío masivo ciego sepa cuántas reseñas tiene.
+ *
+ * Las reseñas van primero porque son el dato más fuerte y el más halagador —
+ * 597 reseñas con 4,7 es algo que costó años. Las tienen 150 de los 173
+ * contactos. Para el resto queda el rubro con la ciudad, que consta en todos.
+ *
+ * Va entre paréntesis en la plantilla a propósito: así funciona como etiqueta
+ * y ninguna de las variantes necesita artículo. "Encontramos X en Google
+ * (Posada en Maracay)" y "(597 reseñas y 4,7 estrellas)" leen igual de bien,
+ * y no hay que adivinar si al rubro le toca "un" o "una".
+ *
+ * El importador dejó todo esto en `notes` como texto libre, no en columnas.
+ * Por eso se lee con expresiones regulares, cada una con su salida: si el
+ * formato de las notas cambia, la peor consecuencia es un mensaje más
+ * genérico, nunca un paréntesis vacío ni un envío roto.
+ */
+function senalDe(lead: LeadCampana | null): string {
+  const notas = lead?.notes ?? ''
+
+  const resenas = Number(notas.match(/(\d+)\s+rese[ñn]as/i)?.[1] ?? 0)
+
+  // Solo se nombran las reseñas cuando son suficientes para ser un elogio.
+  //
+  // Probando la plantilla contra los 173 contactos reales salieron dos
+  // mensajes que no se pueden mandar: "(0 reseñas en Google)" a 23 negocios
+  // —el importador guarda el cero como texto, así que la nota dice
+  // literalmente "0 reseñas"— y "(3 reseñas y 5 estrellas)". Los dos abren
+  // señalando algo flojo de su negocio en el primer contacto. Con 20 y algo
+  // el número dice "esto lleva años funcionando"; con tres dice lo contrario,
+  // y el silencio siempre es mejor que un elogio que no lo es.
+  //
+  // Con el corte en 20 son 55 los que llevan reseñas y 118 el rubro, que no
+  // afirma nada sobre lo bien o mal que le va a nadie.
+  if (resenas >= 20) {
+    // La calificación viene con punto de la fuente en inglés. Acá se escribe
+    // 4,7 — un "4.7" en un mensaje en español delata que el texto lo armó
+    // una máquina con datos importados.
+    const nota = notas.match(/calificaci[oó]n\s+([\d.,]+)/i)?.[1]?.replace('.', ',')
+    return nota ? `${resenas} reseñas y ${nota} estrellas` : `${resenas} reseñas en Google`
+  }
+
+  const rubro = notas.match(/Rubro original:\s*([^·\n]+)/i)?.[1]?.trim()
+  const ciudad = lead?.ciudad?.trim()
+  if (rubro && ciudad) return `${rubro} en ${ciudad}`
+  if (rubro) return rubro
+  if (ciudad) return `negocio en ${ciudad}`
+
+  // Último recurso. Sigue siendo cierto: de ahí salió el número.
+  return 'tu ficha de Google'
+}
+
 export const maxDuration = 60
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
@@ -101,7 +168,7 @@ export async function POST(request: Request) {
 
   const { data: targets, error: tErr } = await db
     .from('campaign_targets')
-    .select('id, lead_id, leads(name, business_name, phone_e164)')
+    .select('id, lead_id, leads(name, business_name, phone_e164, ciudad, notes)')
     .eq('campaign_id', camp.id).eq('estado', 'pendiente')
     .limit(Math.min(tanda, cupo))
 
@@ -115,22 +182,32 @@ export async function POST(request: Request) {
   // Secuencial y no en paralelo: Meta limita por segundo y en paralelo devuelve
   // errores de rate limit que parecen rechazos de contenido.
   for (const t of targets) {
-    const lead = t.leads as { name?: string | null; business_name?: string | null; phone_e164?: string | null } | null
+    const lead = t.leads as LeadCampana | null
     const tel = lead?.phone_e164
     if (!tel) {
       await db.from('campaign_targets').update({ estado: 'omitido', error: 'Sin teléfono válido' }).eq('id', t.id)
       continue
     }
 
-    const params = plantilla.ejemplos.map((_, i) =>
-      i === 0 ? saludoDe(lead) : (lead?.business_name?.trim() || 'tu negocio')
-    )
+    // Cada variable tiene su significado propio. Antes todo lo que no fuera
+    // {{1}} recibía el nombre del negocio, que servía mientras las plantillas
+    // tenían dos variables — con tres, el {{3}} habría repetido el nombre del
+    // negocio dentro de su propio paréntesis.
+    const valores = [saludoDe(lead), lead?.business_name?.trim() || 'tu negocio', senalDe(lead)]
+    const params = plantilla.ejemplos.map((_, i) => valores[i] ?? valores[valores.length - 1])
 
     // El texto REAL que va a recibir el cliente, con las variables ya puestas.
     // Se guarda así y no como "[plantilla] param · param" porque ese marcador
     // era ilegible para Rafael y, peor, Sofía lo veía como el mensaje previo:
     // cuando el cliente respondía, ella no sabía qué le habíamos escrito.
-    const textoEnviado = plantilla.body.replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] ?? '')
+    //
+    // Los botones se anotan al final por la misma razón. Cuando llega un
+    // "Quiero ver ejemplos" pelado, Sofía tiene que poder ver que eso fue un
+    // botón que le ofrecimos nosotros y no una frase que al cliente se le
+    // ocurrió — cambia por completo qué toca responder.
+    const textoEnviado =
+      plantilla.body.replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] ?? '') +
+      (plantilla.botones?.length ? `\n\n[Botones: ${plantilla.botones.join(' · ')}]` : '')
 
     try {
       const { data: convId } = await db.rpc('wa_get_or_create_conversation', {

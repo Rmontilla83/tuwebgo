@@ -17,6 +17,30 @@ export const WA_BASE = `https://wa.me/${WHATSAPP_NEGOCIO}`
 export const SITIO = 'https://tuwebgo.net'
 
 /**
+ * Los tres trabajos que se le mandan a alguien que pide ver ejemplos.
+ *
+ * Son sitios REALES y en línea, no capturas ni maquetas. Esa es toda la
+ * gracia: en un primer contacto en frío el cliente no está evaluando la
+ * página, está evaluando si somos de verdad. Tres dominios que abren en un
+ * toque resuelven esa pregunta más rápido que cualquier argumento.
+ *
+ * Van acá y no en el prompt porque son cadenas exactas. Sofía los tiene
+ * descritos arriba para poder hablar de ellos, pero quien los ESCRIBE es el
+ * código: un dominio con una letra cambiada es un 404, y un 404 en el mensaje
+ * donde estamos demostrando que existimos es peor que no mandar nada.
+ */
+export const PORTAFOLIO = [
+  'https://atryum.net',
+  'https://eluniversodefueguito.com',
+  'https://fortius.fit',
+] as const
+
+/** Bloque listo para pegar al final de un mensaje de WhatsApp. */
+export const PORTAFOLIO_TEXTO =
+  `Estos son trabajos nuestros, échales un ojo:\n${PORTAFOLIO.join('\n')}\n\n` +
+  `Y acá está todo lo demás: ${SITIO}`
+
+/**
  * A qué etapa pasa el lead cuando Sofía detecta cada situación.
  *
  * Sofía SOLO puede mover el lead en la parte de la conversación que ella

@@ -70,6 +70,39 @@ type MetaMensaje = {
   video?: { id?: string; mime_type?: string; caption?: string }
   document?: { id?: string; mime_type?: string; filename?: string; caption?: string }
   referral?: { source_type?: string; ctwa_clid?: string }
+  /** Respuesta a un botón de plantilla: llega como type "button". */
+  button?: { text?: string; payload?: string }
+  /** Respuesta a un botón o lista de un mensaje interactivo. */
+  interactive?: {
+    type?: string
+    button_reply?: { id?: string; title?: string }
+    list_reply?: { id?: string; title?: string; description?: string }
+  }
+}
+
+/**
+ * Lo que el cliente escribió, venga como venga.
+ *
+ * Tocar un botón NO llega como `text`: llega como type "button" con el rótulo
+ * en `button.text`, o como "interactive" si el mensaje no era una plantilla.
+ * Leyendo solo `text.body`, una respuesta por botón se guardaba con el cuerpo
+ * vacío y Sofía contestaba sin saber qué le habían dicho — justo en el primer
+ * mensaje de un contacto en frío, que es donde menos se puede fallar.
+ *
+ * Para el cliente tocar un botón es responder, así que el rótulo se guarda
+ * como texto normal. Es además el único tipo que el CHECK de wa_messages
+ * acepta sin migración, y una migración que no se aplique a tiempo haría que
+ * el mensaje reventara y se perdiera: exactamente lo que se quiere evitar.
+ */
+function textoDelCliente(m: MetaMensaje): string | null {
+  const boton =
+    m.button?.text ??
+    m.interactive?.button_reply?.title ??
+    m.interactive?.list_reply?.title
+  if (boton?.trim()) return boton.trim()
+
+  const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption
+  return m.text?.body ?? caption ?? null
 }
 
 type MetaEstado = {
@@ -176,12 +209,14 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
   }
 
   const media = m.image ?? m.audio ?? m.video ?? m.document
-  const tipo = TIPOS_CONOCIDOS.has(m.type) ? m.type : 'unsupported'
 
   // El caption de una foto o un documento ES texto del cliente y vale igual
-  // que un mensaje. Antes se descartaba.
-  const caption = m.image?.caption ?? m.video?.caption ?? m.document?.caption ?? null
-  const cuerpo = m.text?.body ?? caption ?? null
+  // que un mensaje. Antes se descartaba. Lo mismo vale para el rótulo de un
+  // botón: ver textoDelCliente.
+  const cuerpo = textoDelCliente(m)
+
+  const esBoton = m.type === 'button' || m.type === 'interactive'
+  const tipo = esBoton ? 'text' : TIPOS_CONOCIDOS.has(m.type) ? m.type : 'unsupported'
 
   // ON CONFLICT sobre wamid: Meta reintenta el mismo mensaje hasta 36h.
   const { error: msgErr } = await db
