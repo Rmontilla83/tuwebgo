@@ -36,6 +36,8 @@ type Message = {
   por_bot: boolean
   created_at: string
   media_path: string | null
+  /** Motivo del rebote que dio Meta, cuando status es 'failed'. */
+  error_detail: string | null
   /** true = el `body` no lo escribió el cliente, lo transcribimos nosotros. */
   transcrito: boolean | null
 }
@@ -94,8 +96,45 @@ const ETIQUETA_CORTA: Record<string, string> = {
   pide_humano: 'Pidió una persona',
 }
 
+/** Persona > negocio > teléfono. El teléfono es el último recurso. */
+function tituloConv(c: Conversation): string {
+  return c.leads?.name?.trim()
+      || c.leads?.business_name?.trim()
+      || c.display_name?.trim()
+      || formatPhoneVE(c.phone_e164)
+}
+
+/** El subtítulo solo si aporta algo distinto del título. */
+function detalleConv(c: Conversation): string | null {
+  const t = tituloConv(c)
+  const neg = c.leads?.business_name?.trim()
+  if (neg && neg !== t) return neg
+  const tel = formatPhoneVE(c.phone_e164)
+  return tel !== t ? tel : null
+}
+
 function horaCorta(iso: string) {
   return new Date(iso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * Qué le pasó al mensaje, en palabras.
+ *
+ * Meta reporta cuatro momentos distintos y hasta ahora la burbuja solo
+ * mostraba la hora: no había forma de saber desde el chat si un mensaje de
+ * campaña había llegado, si lo habían abierto o si había rebotado. Con 20
+ * envíos eso es la diferencia entre saber que cinco personas te leyeron y
+ * creer que no salió nada.
+ *
+ * Palabras y no palomitas: el proyecto no usa emoji, y "visto" se entiende
+ * sin tener que aprender qué significan dos rayitas azules.
+ */
+const ESTADO_MENSAJE: Record<string, { texto: string; clase: string }> = {
+  queued:    { texto: 'enviando…', clase: 'opacity-60' },
+  sent:      { texto: 'enviado',   clase: 'opacity-70' },
+  delivered: { texto: 'recibido',  clase: 'opacity-90' },
+  read:      { texto: 'visto',     clase: 'font-semibold' },
+  failed:    { texto: 'no llegó',  clase: 'text-red-200 font-semibold' },
 }
 
 function fechaRelativa(iso: string | null) {
@@ -515,7 +554,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
               <div className="text-center py-14 px-4">
                 <IconChat className="w-9 h-9 mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.4} />
                 <p className="text-sm font-semibold text-[var(--dark)]">{busqueda ? 'Sin resultados' : 'Todavía no hay conversaciones'}</p>
-                {!busqueda && <p className="text-xs text-[var(--text-muted)] mt-1.5">Escribile a un lead desde Pipeline y la conversación aparece acá.</p>}
+                {!busqueda && <p className="text-xs text-[var(--text-muted)] mt-1.5">Escríbele a un lead desde Pipeline y la conversación aparece acá.</p>}
               </div>
             ) : filtradas.map((c) => (
               <button
@@ -525,11 +564,11 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold text-sm text-[var(--dark)] truncate">
-                    {c.leads?.name || c.display_name || formatPhoneVE(c.phone_e164)}
+                    {tituloConv(c)}
                   </p>
                   <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0">{fechaRelativa(c.last_message_at)}</span>
                 </div>
-                {c.leads?.business_name && <p className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">{c.leads.business_name}</p>}
+                {detalleConv(c) && <p className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">{detalleConv(c)}</p>}
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xs text-[var(--text-muted)] truncate flex-1">
                     {c.last_direction === 'out' && <span>Tú: </span>}
@@ -565,7 +604,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                 <button onClick={() => setActiva(null)} className="lg:hidden w-10 h-10 -ml-2 flex items-center justify-center text-[var(--text-muted)] cursor-pointer" aria-label="Volver"><IconFlecha className="w-5 h-5 rotate-180" /></button>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-sm text-[var(--dark)] truncate">
-                    {conv.leads?.name || conv.display_name || formatPhoneVE(conv.phone_e164)}
+                    {tituloConv(conv)}
                   </p>
                   <div className="flex items-center gap-2">
                     <p className="text-[11px] text-[var(--text-muted)] font-mono">{formatPhoneVE(conv.phone_e164)}</p>
@@ -677,8 +716,22 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                       <div className={`flex items-center gap-1.5 mt-1 ${m.direction === 'out' ? 'text-white/60' : 'text-[var(--text-muted)]'}`}>
                         <span className="text-[10px]">{horaCorta(m.created_at)}</span>
                         {m.channel === 'deeplink' && <IconEnlaceExterno className="w-2.5 h-2.5" />}
-                        {m.status === 'failed' && <span className="text-[9px] text-red-200">falló</span>}
+                        {/* Solo en los salientes: de un mensaje que entró ya
+                            sabemos que llegó, decirlo sería ruido. */}
+                        {m.direction === 'out' && ESTADO_MENSAJE[m.status] && (
+                          <>
+                            <span className="text-[10px] opacity-40">·</span>
+                            <span className={`text-[10px] ${ESTADO_MENSAJE[m.status].clase}`}>
+                              {ESTADO_MENSAJE[m.status].texto}
+                            </span>
+                          </>
+                        )}
                       </div>
+                      {/* El motivo del rebote, que es lo que dice si se puede
+                          reintentar o si ese número simplemente no sirve. */}
+                      {m.direction === 'out' && m.status === 'failed' && m.error_detail && (
+                        <p className="text-[10px] text-red-200/90 mt-0.5 break-words">{m.error_detail}</p>
+                      )}
                     </div>
                   </div>
                 ))}
