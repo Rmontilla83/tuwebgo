@@ -40,6 +40,12 @@ export default function CampanaWhatsApp() {
   const [plantilla, setPlantilla] = useState(PLANTILLAS[0]?.name ?? '')
   const [etapasSel, setEtapasSel] = useState<string[]>(['sin_contactar'])
   const [tope, setTope] = useState(200)
+  // Segmento: por rubro o por estado. Vacío = todos los de la etapa.
+  const [segTipo, setSegTipo] = useState<'rubro' | 'estado'>('rubro')
+  const [segSel, setSegSel] = useState<string[]>([])
+  const [segmentos, setSegmentos] = useState<{ tipo: string; valor: string; contactos: number }[]>([])
+  // Cuántos contactos entran a ESTA campaña. 0 = todos los del segmento.
+  const [cuantos, setCuantos] = useState(20)
   const [guardando, setGuardando] = useState(false)
 
   // Envío
@@ -47,16 +53,18 @@ export default function CampanaWhatsApp() {
   const [avance, setAvance] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    const [et, ld, cp, ini] = await Promise.all([
+    const [et, ld, cp, ini, seg] = await Promise.all([
       supabase.from('pipeline_stages').select('slug, label, sort_order').eq('is_lost', false).order('sort_order'),
       supabase.from('leads').select('current_stage').eq('es_prueba', false).not('phone_e164', 'is', null),
       supabase.from('v_campana_progreso').select('*'),
       supabase.rpc('wa_iniciadas_hoy'),
+      supabase.rpc('segmentos_disponibles'),
     ])
     if (et.error || ld.error || cp.error) {
       setError(et.error?.message ?? ld.error?.message ?? cp.error?.message ?? null)
     }
     setEtapas(et.data ?? [])
+    setSegmentos((seg.data as { tipo: string; valor: string; contactos: number }[]) ?? [])
     const c: Record<string, number> = {}
     for (const l of ld.data ?? []) c[l.current_stage] = (c[l.current_stage] ?? 0) + 1
     setConteos(c)
@@ -78,7 +86,14 @@ export default function CampanaWhatsApp() {
     return () => { vivo = false }
   }, [cargar])
 
-  const alcance = etapasSel.reduce((s, e) => s + (conteos[e] ?? 0), 0)
+  // Opciones del segmento elegido, y cuántos contactos abarca la selección.
+  const opcionesSeg = segmentos.filter((s) => s.tipo === segTipo)
+  const enSegmento = segSel.length
+    ? opcionesSeg.filter((s) => segSel.includes(s.valor)).reduce((a, s) => a + s.contactos, 0)
+    : etapasSel.reduce((s, e) => s + (conteos[e] ?? 0), 0)
+
+  // Lo que REALMENTE va a entrar en cola: el segmento, recortado por "cuántos".
+  const alcance = cuantos > 0 ? Math.min(cuantos, enSegmento) : enSegmento
   const plantillaSel = PLANTILLAS.find((p) => p.name === plantilla)
   const cupoRestante = Math.max(0, Math.min(tope, LIMITE_META) - iniciadasHoy)
   const dias = cupoRestante > 0 ? Math.ceil(alcance / Math.min(tope, LIMITE_META)) : 0
@@ -100,7 +115,16 @@ export default function CampanaWhatsApp() {
       if (e1 || !camp) { setError(e1?.message ?? 'No se pudo crear'); return }
 
       const { data: enc, error: e2 } = await supabase.rpc('campana_encolar', {
-        p_campaign_id: camp.id, p_etapas: etapasSel, p_canales: null, p_limite: null,
+        p_campaign_id: camp.id,
+        p_etapas: etapasSel,
+        p_canales: null,
+        // El límite ahora SÍ viaja: la campaña encola exactamente los que
+        // pediste. Antes iba en null y encolaba los 464 de la etapa, dejando
+        // que el tope diario goteara — que no es lo mismo que "mándale a 20".
+        p_limite: cuantos > 0 ? cuantos : null,
+        p_rubros:   segTipo === 'rubro'  && segSel.length ? segSel : null,
+        p_ciudades: null,
+        p_estados:  segTipo === 'estado' && segSel.length ? segSel : null,
       })
       if (e2) { setError(e2.message); return }
 
@@ -313,6 +337,72 @@ export default function CampanaWhatsApp() {
               })}
             </div>
             <p className="text-[11px] text-[var(--text-muted)] mt-1.5">Solo cuenta contactos con móvil válido.</p>
+          </div>
+
+          {/* ── Segmento: el grupo dentro de la etapa ── */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Grupo <span className="font-medium normal-case tracking-normal">(opcional)</span>
+              </label>
+              <div className="flex gap-1">
+                {(['rubro', 'estado'] as const).map((t) => (
+                  <button key={t} type="button"
+                    onClick={() => { setSegTipo(t); setSegSel([]) }}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold border cursor-pointer ${
+                      segTipo === t ? 'bg-[var(--dark)] text-white border-[var(--dark)]'
+                                    : 'bg-[var(--bg-alt)] text-[var(--text-secondary)] border-[var(--border)]'
+                    }`}>
+                    Por {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              {opcionesSeg.length === 0 && (
+                <p className="text-[11px] text-[var(--text-muted)]">Los contactos cargados no tienen {segTipo}.</p>
+              )}
+              {opcionesSeg.map((s) => {
+                const sel = segSel.includes(s.valor)
+                return (
+                  <button key={s.valor} type="button"
+                    onClick={() => setSegSel((p) => sel ? p.filter((x) => x !== s.valor) : [...p, s.valor])}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                      sel ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-[var(--bg-alt)] text-[var(--text-secondary)] border-[var(--border)]'
+                    }`}>
+                    {s.valor} <span className="opacity-70">{s.contactos}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+              {segSel.length ? `${enSegmento} contactos en el grupo elegido.` : 'Sin elegir grupo, entran todos los de la etapa.'}
+            </p>
+          </div>
+
+          {/* ── Cuántos entran a ESTA campaña ── */}
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+              Cuántos mandar — {cuantos > 0 ? cuantos : 'todos'}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {[10, 20, 30, 50, 0].map((n) => (
+                <button key={n} type="button" onClick={() => setCuantos(n)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                    cuantos === n ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                                  : 'bg-[var(--bg-alt)] text-[var(--text-secondary)] border-[var(--border)]'
+                  }`}>
+                  {n === 0 ? 'Todos' : n}
+                </button>
+              ))}
+            </div>
+            {/* Esto es lo que separa "mándale a 20" de "gotear 20 por día sobre
+                toda la lista": la campaña encola exactamente esta cantidad. */}
+            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+              La campaña queda cerrada en {cuantos > 0 ? `${alcance} contacto${alcance === 1 ? '' : 's'}` : 'todo el grupo'}
+              {cuantos > 0 && ', y no crece después. Entran primero los mejor calificados.'}
+            </p>
           </div>
 
           <div>
