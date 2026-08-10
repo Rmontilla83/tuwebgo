@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatPhoneVE, templatesForStage, waLink } from '@/lib/whatsapp'
-import { PLANTILLAS, previsualizar, type PlantillaWA } from '@/lib/waTemplates'
+import { PLANTILLAS, type PlantillaWA } from '@/lib/waTemplates'
+import { paramsDePlantilla } from '@/lib/plantillaParams'
 import { ICONO_HANDOFF, IconChat, IconCerrar, IconAsistente, IconUsuario, IconMano, IconFlecha, IconEnlaceExterno, IconLista, IconTelefono } from '@/components/icons'
 
 export type Conversation = {
@@ -21,7 +22,14 @@ export type Conversation = {
   status: string
   bot_activo: boolean
   handoff_motivo: string | null
-  leads?: { name: string | null; business_name: string | null; current_stage: string } | null
+  leads?: {
+    name: string | null
+    business_name: string | null
+    current_stage: string
+    // Los usa senalDe para armar el {{3}} de las plantillas en frio.
+    ciudad?: string | null
+    notes?: string | null
+  } | null
 }
 
 type Message = {
@@ -170,6 +178,8 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
   const [soloPendientes, setSoloPendientes] = useState(false)
   const [redactando, setRedactando] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  /** Plantilla elegida en el desplegable de "ventana cerrada". */
+  const [elegida, setElegida] = useState('')
   const [rt, setRt] = useState<'conectando' | 'ok' | 'error' | 'sin-sesion'>('conectando')
   const finRef = useRef<HTMLDivElement>(null)
   const canalRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -178,6 +188,11 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
   // conversación abierta actual, no la que había cuando se suscribió.
   const activaRef = useRef<string | null>(null)
   useEffect(() => { activaRef.current = activa }, [activa])
+
+  // Al cambiar de conversacion se olvida la plantilla elegida. Si no, queda
+  // seleccionada la del chat anterior y un toque en "Enviar" le manda a este
+  // cliente algo que era para otro — y una plantilla no se puede deshacer.
+  useEffect(() => { setElegida('') }, [activa])
 
   const conv = convs.find((c) => c.id === activa) ?? null
 
@@ -201,7 +216,7 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
   const recargarConvs = useCallback(async () => {
     const { data, error: err } = await supabase
       .from('wa_conversations')
-      .select('*, leads(name, business_name, current_stage)')
+      .select('*, leads(name, business_name, current_stage, ciudad, notes)')
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .range(0, 49)
     if (err) { setError(err.message); return }
@@ -395,12 +410,12 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
     if (!conv || enviando) return
     setError(null); setEnviando(true)
     try {
-      // Los ejemplos de la plantilla se sustituyen por los datos reales del lead.
-      const params = p.ejemplos.map((_, i) =>
-        i === 0
-          ? (conv.leads?.name?.split(/\s+/)[0] ?? 'Hola')
-          : (conv.leads?.business_name ?? 'tu negocio')
-      )
+      // Las variables las arma `paramsDePlantilla`, el mismo código que usa el
+      // envío de campañas. Acá estaban resueltas aparte y se habían quedado
+      // atrás: el saludo caía en 'Hola' —y salía "Hola Hola"— y todo lo que no
+      // fuera {{1}} recibía el nombre del negocio, así que una plantilla de
+      // tres variables lo repetía dentro de su propio paréntesis.
+      const params = paramsDePlantilla(p.ejemplos, conv.leads)
       const res = await fetch('/api/wa/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -483,6 +498,19 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
 
   const sinLeer = convs.reduce((s, c) => s + c.unread_count, 0)
   const v = ventana(conv)
+
+  // El texto EXACTO que va a recibir el cliente, con las variables de este
+  // lead ya puestas. Antes esto era un `title`, o sea invisible en el
+  // telefono: se mandaba a ciegas algo que cuesta dinero y lo lee un cliente.
+  const vistaPrevia = (() => {
+    const p = PLANTILLAS.find((x) => x.name === elegida)
+    if (!p) return ''
+    const params = paramsDePlantilla(p.ejemplos, conv?.leads)
+    const cuerpo = p.body.replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] ?? '')
+    return p.botones?.length ? `${cuerpo}
+
+[Botones: ${p.botones.join(' · ')}]` : cuerpo
+  })()
 
   return (
     <div className="animate-fade-in">
@@ -741,24 +769,56 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
               <div className="p-3 border-t border-[var(--border-light)]">
                 {/* Fuera de la ventana de 24h, Meta solo acepta plantillas aprobadas.
                     En vez de bloquear el envío, ofrecemos las que hay. */}
+                {/*
+                  Un desplegable y no once botones.
+                  Las plantillas puestas como botones ocupaban toda la pantalla
+                  del teléfono: el aviso tapaba la conversación entera y no se
+                  podía leer lo que el cliente había escrito, que es justo lo
+                  que uno necesita ver para elegir qué mandarle.
+
+                  El <select> nativo además abre el selector del sistema en
+                  móvil, que se maneja con el pulgar y no obliga a apuntarle a
+                  un botón de 11px.
+
+                  La previsualización pasa a ser texto visible en vez de un
+                  `title`: un tooltip no existe en una pantalla táctil, así que
+                  en el teléfono se mandaba a ciegas — y cada plantilla cuesta
+                  dinero y se la lleva un cliente real.
+                */}
                 {!v.abierta && (
                   <div className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200">
-                    <p className="text-[11px] text-amber-900 mb-2">
-                      Pasaron más de 24 horas desde su último mensaje. Meta solo permite plantillas aprobadas.
+                    <p className="text-[11px] text-amber-900 mb-2 leading-snug">
+                      Pasaron más de 24 horas. Meta solo permite plantillas aprobadas.
                     </p>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {PLANTILLAS.map((p) => (
-                        <button
-                          key={p.name}
-                          onClick={() => enviarPlantilla(p)}
-                          disabled={enviando}
-                          title={previsualizar(p)}
-                          className="px-2.5 py-1.5 rounded-lg bg-white border border-amber-300 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 cursor-pointer transition-all"
-                        >
-                          {p.proposito}
-                        </button>
-                      ))}
+
+                    <div className="flex gap-1.5">
+                      <select
+                        value={elegida}
+                        onChange={(e) => setElegida(e.target.value)}
+                        aria-label="Elegir plantilla"
+                        /* 16px o iOS hace zoom solo al enfocarlo. */
+                        className="flex-1 min-w-0 text-base sm:text-[12px] px-2 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 font-semibold cursor-pointer"
+                      >
+                        <option value="">Elegir plantilla…</option>
+                        {PLANTILLAS.filter((p) => !p.proposito.startsWith('NO USAR')).map((p) => (
+                          <option key={p.name} value={p.name}>{p.proposito}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => { const p = PLANTILLAS.find((x) => x.name === elegida); if (p) enviarPlantilla(p) }}
+                        disabled={enviando || !elegida}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[12px] font-bold disabled:opacity-40 cursor-pointer"
+                      >
+                        {enviando ? 'Enviando…' : 'Enviar'}
+                      </button>
                     </div>
+
+                    {vistaPrevia && (
+                      <p className="mt-2 p-2 rounded-lg bg-white/70 border border-amber-200 text-[11px] text-amber-900 whitespace-pre-wrap leading-snug max-h-28 overflow-y-auto">
+                        {vistaPrevia}
+                      </p>
+                    )}
+
                     <p className="text-[10px] text-amber-800/70 mt-1.5">
                       Si no está aprobada todavía, Meta la rechaza y te lo digo acá.
                     </p>

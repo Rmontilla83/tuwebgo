@@ -14,7 +14,7 @@ export default async function InboxPage() {
   // loading.tsx cubra la espera en vez de un spinner interno.
   const res = await supabase
     .from('wa_conversations')
-    .select('*, leads(name, business_name, current_stage)')
+    .select('*, leads(name, business_name, current_stage, ciudad, notes)')
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .range(0, PAGE - 1)
 
