@@ -155,14 +155,28 @@ function fechaRelativa(iso: string | null) {
   return d.toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })
 }
 
-/** Ventana de servicio de 24h de Meta: fuera de ella solo se envían plantillas aprobadas. */
+/**
+ * Ventana de servicio de 24h de Meta: fuera de ella solo se envían plantillas
+ * aprobadas.
+ *
+ * Se distingue entre "nunca se abrió" y "se venció" porque no son lo mismo y
+ * el aviso decía siempre lo segundo. A un contacto de campaña que todavía no
+ * ha respondido nunca le corrieron 24 horas de nada: la ventana la abre el
+ * cliente al escribir, no el reloj. Decirle a Rafael "pasaron más de 24 horas
+ * desde su último mensaje" sobre alguien que jamás escribió es informarle mal
+ * justo cuando está por gastar una plantilla.
+ */
 function ventana(conv: Conversation | null) {
-  if (!conv?.window_expires_at) return { abierta: false, texto: 'Sin ventana abierta' }
+  if (!conv?.window_expires_at) {
+    return { abierta: false, motivo: 'nunca' as const, texto: 'Sin ventana abierta' }
+  }
   const restante = new Date(conv.window_expires_at).getTime() - Date.now()
-  if (restante <= 0) return { abierta: false, texto: 'Ventana de 24h cerrada' }
+  if (restante <= 0) {
+    return { abierta: false, motivo: 'vencida' as const, texto: 'Ventana de 24h cerrada' }
+  }
   const h = Math.floor(restante / 3600000)
   const m = Math.floor((restante % 3600000) / 60000)
-  return { abierta: true, texto: `Ventana abierta · ${h}h ${m}m` }
+  return { abierta: true, motivo: 'abierta' as const, texto: `Ventana abierta · ${h}h ${m}m` }
 }
 
 export type Etapa = { slug: string; label: string; sort_order: number }
@@ -514,7 +528,16 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      {/*
+        Con una conversación abierta en el teléfono, este encabezado se
+        esconde. Ocupaba unos 85px de una pantalla de 667 diciendo "Inbox" y
+        cuántas conversaciones hay — información de la LISTA, que en ese
+        momento ni se ve. El chat quedaba con dos globos visibles.
+
+        En escritorio se queda: ahí la lista y la conversación conviven y el
+        contador sí está a la vista de lo que describe.
+      */}
+      <div className={`mb-4 items-start justify-between gap-3 ${activa ? 'hidden lg:flex' : 'flex'}`}>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--dark)] font-[family-name:var(--font-display)] tracking-tight">Inbox</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
@@ -552,7 +575,16 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
       )}
 
 
-      <div className="grid lg:grid-cols-[320px_1fr] gap-4 h-[calc(100dvh-280px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-[420px]">
+      {/*
+        El alto se recalcula cuando el encabezado se esconde. Sin esto la
+        altura seguía restando los 85px que ya no ocupa nadie y quedaba un
+        hueco muerto debajo del cuadro de escribir.
+      */}
+      <div className={`grid lg:grid-cols-[320px_1fr] gap-4 min-h-[420px] lg:h-[calc(100dvh-280px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] ${
+        activa
+          ? 'h-[calc(100dvh-180px-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
+          : 'h-[calc(100dvh-280px-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
+      }`}>
         {/* ── Lista ── */}
         <div className={`bg-[var(--card)] rounded-2xl border border-[var(--border)] flex-col overflow-hidden ${activa ? 'hidden lg:flex' : 'flex'}`}>
           <div className="p-3 border-b border-[var(--border-light)] space-y-2">
@@ -788,7 +820,9 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                 {!v.abierta && (
                   <div className="mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200">
                     <p className="text-[11px] text-amber-900 mb-2 leading-snug">
-                      Pasaron más de 24 horas. Meta solo permite plantillas aprobadas.
+                      {v.motivo === 'nunca'
+                        ? 'Todavía no te ha escrito, así que no hay ventana abierta. Meta solo permite plantillas aprobadas.'
+                        : 'Pasaron más de 24 horas desde su último mensaje. Meta solo permite plantillas aprobadas.'}
                     </p>
 
                     <div className="flex gap-1.5">
