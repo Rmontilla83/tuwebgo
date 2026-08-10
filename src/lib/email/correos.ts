@@ -181,6 +181,41 @@ export function confirmarBriefAlCliente(c: { correo: string; negocio: string }) 
   })
 }
 
+/**
+ * El pre-diseño está listo. Va al CLIENTE.
+ *
+ * Es el correo que cobra los $50: hasta acá el cliente pagó por una promesa y
+ * esto es la promesa cumplida. Por eso el enlace va en un botón grande y solo,
+ * sin competir con nada, y el correo no pide nada a cambio salvo que mire.
+ *
+ * Se manda además del WhatsApp, no en su lugar. En el chat el enlace se pierde
+ * entre mensajes a los dos días; en el correo sigue ahí cuando lo quiera
+ * enseñar a un socio o a la esposa, que es exactamente lo que pasa cuando
+ * alguien va a decidir sobre su negocio.
+ */
+export function avisarPredisenoListo(p: { correo: string; negocio: string; url: string }) {
+  const cuerpo: Correo = {
+    preheader: `La página de ${p.negocio} ya está lista para que la veas.`,
+    etiqueta: 'Tu pre-diseño está listo',
+    tono: 'bueno',
+    titulo: 'Tu página ya está lista',
+    parrafos: [
+      `Terminamos el pre-diseño de ${p.negocio}. Ábrelo desde el botón y date una vuelta con calma, en el teléfono y en la computadora.`,
+      'Esto no es una maqueta ni una plantilla de muestra: es tu página, con tus textos, tus servicios y tus datos de contacto.',
+      'Cuando la veas, respóndenos por WhatsApp y dinos qué cambiarías. Colores, textos, el orden de las secciones, lo que sea. Ajustamos hasta que quede como la imaginaste.',
+    ],
+    boton: { texto: 'Ver mi página', url: p.url },
+    nota: 'Si el botón no abre, copia y pega esta dirección en tu navegador: ' + p.url,
+  }
+  return enviarCorreo({
+    para: p.correo,
+    asunto: `Tu página está lista — ${p.negocio}`,
+    correo: cuerpo,
+    etiqueta: 'prediseno_listo',
+    responderA: EQUIPO[0],
+  })
+}
+
 /* ══════════════════════════════════════════════════════════════
    4. Campañas
    ══════════════════════════════════════════════════════════════ */

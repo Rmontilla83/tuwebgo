@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { IconChat, IconCheck, IconDescarga, IconLista, IconFlecha, IconEnlaceExterno } from '@/components/icons'
+import { IconChat, IconCheck, IconDescarga, IconLista, IconFlecha, IconEnlaceExterno, IconCorreo } from '@/components/icons'
 import { briefAFormatoBuilder } from '@/lib/briefBuilder'
 
 export type BriefFila = {
@@ -166,6 +166,122 @@ function descargarBrief(f: BriefFila) {
   URL.revokeObjectURL(url)
 }
 
+type Avisado = { fecha: string; url: string }
+
+/**
+ * Avisarle al cliente que su pre-diseño está listo.
+ *
+ * Es el momento que cobra los $50: hasta acá el cliente pagó por una promesa.
+ * Se le manda el enlace por correo además del WhatsApp — en el chat se pierde
+ * entre mensajes a los dos días, y este es justo el enlace que va a querer
+ * enseñarle a un socio antes de decidir.
+ *
+ * El aviso queda registrado y el botón cambia: dentro de dos semanas, con
+ * varios clientes encima, "¿a este ya le mandé su página?" es la pregunta que
+ * hace que uno la mande dos veces o ninguna.
+ */
+function AvisarPrediseno({
+  brief, avisado, onAvisado,
+}: {
+  brief: BriefFila
+  avisado?: Avisado
+  onAvisado: (id: number, a: Avisado) => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const [url, setUrl] = useState(avisado?.url ?? '')
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [listo, setListo] = useState(false)
+
+  const tieneCorreo = typeof brief.datos?.email === 'string' && brief.datos.email.trim().length > 3
+
+  async function enviar() {
+    setCargando(true); setError(null)
+    try {
+      const res = await fetch('/api/brief/aviso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefId: brief.id, url }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error ?? `Error ${res.status}`)
+      onAvisado(brief.id, { fecha: new Date().toISOString(), url })
+      setListo(true)
+      setTimeout(() => { setListo(false); setAbierto(false) }, 2500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo enviar')
+    } finally { setCargando(false) }
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        title={
+          tieneCorreo
+            ? 'Manda al cliente el enlace de su pre-diseño por correo'
+            : 'Este cliente no dejó correo en el formulario'
+        }
+        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border ${
+          avisado
+            ? 'border-[var(--border-light)] text-[var(--text-secondary)]'
+            : 'border-indigo-300 bg-indigo-50 text-indigo-800'
+        }`}
+      >
+        <IconCorreo className="w-3.5 h-3.5" />
+        {avisado ? 'Avisado — mandar de nuevo' : 'Avisar que está listo'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-full border border-[var(--border)] rounded-xl p-3.5 bg-[var(--bg-alt)]">
+      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+        Avisar que el pre-diseño está listo
+      </p>
+      <p className="text-xs text-[var(--text-secondary)] mb-3">
+        {tieneCorreo
+          ? <>Le llega a <b>{String(brief.datos?.email)}</b> con el enlace en un botón.</>
+          : 'Este cliente no dejó correo. Tendrás que mandarle el enlace por WhatsApp.'}
+      </p>
+
+      {avisado && (
+        <p className="text-[11px] text-[var(--text-muted)] mb-2">
+          Ya se le avisó el {fecha(avisado.fecha)}.
+        </p>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          value={url}
+          onChange={(e) => { setUrl(e.target.value); setError(null) }}
+          placeholder="https://sunegocio.tuwebgo.net"
+          autoCapitalize="off"
+          autoCorrect="off"
+          /* 16px en móvil o iOS hace zoom solo al enfocarlo. */
+          className="flex-1 min-w-0 text-base sm:text-sm px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+        />
+        <button
+          onClick={enviar}
+          disabled={cargando || !url.trim() || !tieneCorreo}
+          className="px-3 py-2 rounded-lg text-sm font-semibold bg-[var(--primary)] text-white cursor-pointer disabled:opacity-50 whitespace-nowrap"
+        >
+          {listo ? 'Enviado' : cargando ? 'Enviando…' : 'Enviar'}
+        </button>
+        <button
+          onClick={() => { setAbierto(false); setError(null) }}
+          className="px-3 py-2 rounded-lg text-sm font-semibold border border-[var(--border)] bg-[var(--card)] cursor-pointer"
+        >
+          Cancelar
+        </button>
+      </div>
+
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+    </div>
+  )
+}
+
 /**
  * Enlace del formulario para un cliente que no llegó por WhatsApp.
  *
@@ -280,6 +396,16 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
   const [abierto, setAbierto] = useState<number | null>(initial[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
   const [copiado, setCopiado] = useState<number | null>(null)
+
+  // A qué briefs ya se les avisó. Se carga aparte porque vive en app_settings
+  // y no en la fila del brief: no hay columna donde guardarlo sin migración.
+  const [avisados, setAvisados] = useState<Record<string, Avisado>>({})
+  useEffect(() => {
+    fetch('/api/brief/aviso')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.avisados) setAvisados(d.avisados) })
+      .catch(() => { /* sin esto el botón solo pierde la marca de "ya avisado" */ })
+  }, [])
 
   async function copiarParaBuilder(f: BriefFila) {
     try {
@@ -423,6 +549,11 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
                       <IconCheck className="w-3.5 h-3.5" />
                       {f.revisado ? 'Marcar sin revisar' : 'Marcar revisado'}
                     </button>
+                    <AvisarPrediseno
+                      brief={f}
+                      avisado={avisados[String(f.id)]}
+                      onAvisado={(id, a) => setAvisados((p) => ({ ...p, [String(id)]: a }))}
+                    />
                   </div>
 
                   {GRUPOS.map((g) => {
