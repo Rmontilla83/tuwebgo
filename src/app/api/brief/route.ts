@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { esTokenManual, verificarTokenManual } from '@/lib/briefManual'
 
 export const runtime = 'nodejs'
 
@@ -21,7 +22,8 @@ const MAX_CAMPO = 2000
 const MAX_CLAVES = 60
 
 type Resuelto = {
-  conversation_id: string
+  /** null cuando el enlace se generó a mano: ese cliente no tiene conversación. */
+  conversation_id: string | null
   lead_id: string | null
   nombre: string | null
   negocio: string | null
@@ -30,6 +32,24 @@ type Resuelto = {
 
 async function resolver(token: string) {
   const db = createAdminClient()
+
+  // Los enlaces manuales se validan con la firma y no contra la base: no hay
+  // conversación que buscar. Ver lib/briefManual.ts.
+  if (esTokenManual(token)) {
+    const manual = verificarTokenManual(token)
+    if (!manual) return { db, fila: undefined }
+    const fila: Resuelto = {
+      conversation_id: null,
+      lead_id: null,
+      nombre: null,
+      negocio: manual.etiqueta || null,
+      // Siempre false: sin conversación no hay con qué comprobarlo, y avisar
+      // "ya lo enviaste" a quien no lo envió es peor que no avisar nada.
+      ya_enviado: false,
+    }
+    return { db, fila }
+  }
+
   const { data, error } = await db.rpc('brief_resolver', { p_token: token })
   if (error) throw new Error(error.message)
   const fila = (Array.isArray(data) ? data[0] : data) as Resuelto | undefined
@@ -110,15 +130,21 @@ export async function POST(request: Request) {
     // los mensajes, pero como UNA línea. El contenido se lee en el portal.
     // Si esto falla el brief ya está guardado, que es lo que importa: se
     // registra y se sigue.
-    const { error: msgErr } = await db.from('wa_messages').insert({
-      conversation_id: fila.conversation_id,
-      direction: 'in',
-      channel: 'cloud_api',
-      msg_type: 'system',
-      body: 'El cliente completó el formulario del pre-diseño.',
-      status: 'delivered',
-    })
-    if (msgErr) console.error('[api/brief] aviso en conversación:', msgErr.message)
+    //
+    // Con un enlace manual no hay conversación donde dejar el rastro, y el
+    // insert reventaría por la clave foránea. El brief igual queda en la
+    // sección Briefs, que es donde se trabaja.
+    if (fila.conversation_id) {
+      const { error: msgErr } = await db.from('wa_messages').insert({
+        conversation_id: fila.conversation_id,
+        direction: 'in',
+        channel: 'cloud_api',
+        msg_type: 'system',
+        body: 'El cliente completó el formulario del pre-diseño.',
+        status: 'delivered',
+      })
+      if (msgErr) console.error('[api/brief] aviso en conversación:', msgErr.message)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e) {

@@ -63,8 +63,20 @@ export default function ControlBot() {
             activo ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'
           }`}
         >
-          <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-            activo ? 'translate-x-6' : 'translate-x-1'
+          {/*
+            `left-1` no es decorativo: sin él la perilla se posicionaba sola.
+            Un elemento `absolute` sin `left` arranca en su posición estática, y
+            como el botón hereda `text-align: center`, esa posición es el CENTRO
+            de la pastilla (24px), no el borde. Medido en navegador: apagada
+            quedaba pegada al borde DERECHO —o sea, se veía encendida— y
+            encendida se salía 20px fuera de la pastilla, flotando suelta.
+
+            Con el ancla puesta, el desplazamiento es lo que dice ser: 0 a la
+            izquierda, 20px a la derecha. Pastilla 48, perilla 20, 4 de margen
+            de cada lado.
+          */}
+          <span className={`absolute left-1 top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+            activo ? 'translate-x-5' : 'translate-x-0'
           }`} />
         </button>
       </div>

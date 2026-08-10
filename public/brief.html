@@ -486,6 +486,35 @@ footer{text-align:center;font-size:12px;color:var(--mute);padding:14px 0 20px}
     </div>
     <div class="err" data-err="colores">Elige una opción.</div>
   </div>
+
+  <!-- Posicionamiento y tema van acá dentro y no en un paso propio: sumar
+       pasos a un formulario de 9 es la forma más rápida de que lo abandonen a
+       la mitad. Son dos toques al final de un paso que ya se está mirando.
+
+       El posicionamiento es la pregunta que más cambia el diseño y no estaba
+       en ninguna parte. "¿Muestro precios?" no la responde: un negocio de lujo
+       puede mostrarlos y uno económico puede ocultarlos. -->
+  <div class="field" style="margin-top:24px">
+    <label class="lb">¿Dónde te ubicas en precio?</label>
+    <div class="chips" data-single="posicion">
+      <button type="button" class="chip" aria-pressed="false" data-v="Económico — el más accesible del mercado">Económico</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Precio justo — buena calidad sin exagerar">Precio justo</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Equilibrado — ni lo más barato ni lo más caro">Equilibrado</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Premium — cuesta más y se nota por qué">Premium</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Exclusivo — alto valor, pocos clientes">Exclusivo</button>
+    </div>
+    <div class="err" data-err="posicion">Elige una opción.</div>
+  </div>
+
+  <div class="field" style="margin-top:24px">
+    <label class="lb">¿Fondo claro u oscuro?</label>
+    <div class="chips" data-single="tema">
+      <button type="button" class="chip" aria-pressed="false" data-v="Claro">Claro</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Oscuro">Oscuro</button>
+      <button type="button" class="chip" aria-pressed="false" data-v="Que ustedes decidan">Decidan ustedes</button>
+    </div>
+    <div class="err" data-err="tema">Elige una opción.</div>
+  </div>
 </section>
 
 <!-- 9 · MATERIAL -->
@@ -730,7 +759,7 @@ function validate(n){
     var w = val("f_wa").replace(/\D/g,"");
     if(w.length < 10){ showErr("f_wa"); if(!bad) bad = $("f_wa"); }
   }
-  if(n === 8){ need("estilo"); need("colores"); }
+  if(n === 8){ need("estilo"); need("colores"); need("posicion"); need("tema"); }
 
   if(bad){
     bad.scrollIntoView({behavior:"smooth", block:"center"});
@@ -814,6 +843,8 @@ function build(){
   t += "\n*ESTILO*\n";
   t += line("Sensación", picks.estilo);
   t += line("Colores", picks.colores);
+  t += line("Posición en precio", picks.posicion);
+  t += line("Fondo", picks.tema);
   t += "\n*MATERIAL Y EXTRAS*\n";
   t += line("Tiene", mat);
   t += line("Referencia", val("f_ref"));
@@ -857,6 +888,8 @@ function datos(){
     horario:     val("f_horario"),
     estilo:      picks.estilo || "",
     colores:     picks.colores || "",
+    posicion:    picks.posicion || "",
+    tema:        picks.tema || "",
     material:    picks.material || [],
     referencia:  val("f_ref"),
     subdominio:  val("f_sub"),

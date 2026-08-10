@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { IconChat, IconCheck, IconDescarga, IconLista, IconFlecha } from '@/components/icons'
+import { IconChat, IconCheck, IconDescarga, IconLista, IconFlecha, IconEnlaceExterno } from '@/components/icons'
+import { briefAFormatoBuilder } from '@/lib/briefBuilder'
 
 export type BriefFila = {
   id: number
@@ -74,6 +75,8 @@ const GRUPOS: { titulo: string; campos: [string, string][] }[] = [
     campos: [
       ['estilo', 'Sensación'],
       ['colores', 'Colores'],
+      ['posicion', 'Posición en precio'],
+      ['tema', 'Fondo'],
       ['referencia', 'Página de referencia'],
     ],
   },
@@ -163,10 +166,130 @@ function descargarBrief(f: BriefFila) {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Enlace del formulario para un cliente que no llegó por WhatsApp.
+ *
+ * El enlace de siempre nace de una conversación, así que un cliente de
+ * Instagram, de un conocido o de una reunión se quedaba sin formulario — y el
+ * formulario es obligatorio, no hay otra vía para los datos del negocio.
+ *
+ * El nombre es opcional pero conviene ponerlo: viaja dentro del enlace, así
+ * que el brief llega ya identificado aunque el cliente escriba otra cosa.
+ */
+function EnlaceManual() {
+  const [abierto, setAbierto] = useState(false)
+  const [etiqueta, setEtiqueta] = useState('')
+  const [url, setUrl] = useState('')
+  const [copiado, setCopiado] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function generar() {
+    setCargando(true); setError(null); setCopiado(false)
+    try {
+      const res = await fetch('/api/brief/enlace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ etiqueta }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error ?? `Error ${res.status}`)
+      setUrl(d.url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo generar')
+    } finally { setCargando(false) }
+  }
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    } catch {
+      setError('No se pudo copiar. Selecciona el texto y cópialo a mano.')
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        onClick={() => setAbierto(true)}
+        className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-alt)] text-[var(--text-secondary)] cursor-pointer mb-5"
+      >
+        <IconEnlaceExterno className="w-3.5 h-3.5" />
+        Crear enlace para un cliente
+      </button>
+    )
+  }
+
+  return (
+    <div className="border border-[var(--border)] rounded-xl p-4 mb-5 bg-[var(--bg-alt)]">
+      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+        Enlace del formulario
+      </p>
+      <p className="text-xs text-[var(--text-secondary)] mb-3">
+        Para un cliente que no llegó por WhatsApp. Vence en 30 días.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          value={etiqueta}
+          onChange={(e) => { setEtiqueta(e.target.value); setUrl('') }}
+          placeholder="Nombre del negocio (opcional)"
+          /* 16px o iOS hace zoom solo al enfocarlo. Ver feedback_mobile_ux. */
+          className="flex-1 min-w-0 text-base sm:text-sm px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+        />
+        <button
+          onClick={generar}
+          disabled={cargando}
+          className="px-3 py-2 rounded-lg text-sm font-semibold bg-[var(--primary)] text-white cursor-pointer disabled:opacity-60 whitespace-nowrap"
+        >
+          {cargando ? 'Generando…' : 'Generar'}
+        </button>
+      </div>
+
+      {url && (
+        <div className="mt-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 min-w-0 text-base sm:text-xs font-mono px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+            />
+            <button
+              onClick={copiar}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border border-[var(--border)] bg-[var(--card)] cursor-pointer whitespace-nowrap"
+            >
+              {copiado ? <><IconCheck className="w-3.5 h-3.5" />Copiado</> : 'Copiar'}
+            </button>
+          </div>
+          <p className="text-[11px] text-[var(--text-muted)] mt-2">
+            Cada enlace sirve para un solo cliente: el nombre va dentro. Para otro, genera uno nuevo.
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+    </div>
+  )
+}
+
 export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
   const [filas, setFilas] = useState(initial)
   const [abierto, setAbierto] = useState<number | null>(initial[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState<number | null>(null)
+
+  async function copiarParaBuilder(f: BriefFila) {
+    try {
+      await navigator.clipboard.writeText(briefAFormatoBuilder(f.datos ?? {}, f.negocio))
+      setCopiado(f.id)
+      setTimeout(() => setCopiado(null), 2000)
+    } catch {
+      setError('No se pudo copiar. Descarga el .md y cópialo de ahí.')
+    }
+  }
 
   async function alternarRevisado(f: BriefFila) {
     const nuevo = !f.revisado
@@ -187,9 +310,10 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
     return (
       <div className="max-w-3xl">
         <h1 className="text-xl font-bold mb-1">Briefs</h1>
-        <p className="text-sm text-[var(--text-secondary)] mb-6">
+        <p className="text-sm text-[var(--text-secondary)] mb-5">
           Lo que los clientes responden en el formulario del pre-diseño.
         </p>
+        <EnlaceManual />
         <div className="border border-[var(--border-light)] rounded-2xl p-8 text-center">
           <IconLista className="w-8 h-8 mx-auto mb-3 text-[var(--text-muted)]" />
           <p className="font-semibold mb-1">Todavía no hay ninguno</p>
@@ -209,6 +333,8 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
         {filas.length} {filas.length === 1 ? 'recibido' : 'recibidos'}
         {sinRevisar > 0 && <> · <span className="text-amber-700 font-semibold">{sinRevisar} sin revisar</span></>}
       </p>
+
+      <EnlaceManual />
 
       {error && (
         <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">{error}</p>
@@ -264,6 +390,26 @@ export default function BriefsClient({ initial }: { initial: BriefFila[] }) {
                     >
                       <IconDescarga className="w-3.5 h-3.5" />
                       Descargar .md
+                    </button>
+                    {/*
+                      Copia y no descarga: el destino de esto es pegarlo como
+                      PRIMER mensaje del constructor de landings, que con este
+                      formato se salta sus 4 rondas de preguntas y arranca
+                      directo en FASE 0. Un archivo habría que abrirlo para
+                      copiarlo igual.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => copiarParaBuilder(f)}
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border ${
+                        copiado === f.id
+                          ? 'border-green-300 bg-green-50 text-green-800'
+                          : 'border-[var(--border-light)] hover:bg-[var(--card-hover)]'
+                      }`}
+                    >
+                      {copiado === f.id
+                        ? <><IconCheck className="w-3.5 h-3.5" />Copiado</>
+                        : <><IconEnlaceExterno className="w-3.5 h-3.5" />Copiar para el constructor</>}
                     </button>
                     <button
                       type="button"
