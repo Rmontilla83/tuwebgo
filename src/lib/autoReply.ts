@@ -3,6 +3,7 @@ import { redactarBorrador, type TurnoConversacion } from '@/lib/gemini'
 import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, HANDOFF_PAUSA_BOT } from '@/lib/config'
 import { urlFormulario } from '@/lib/pagos'
 import { avisarPagoReportado } from '@/lib/email/correos'
+import { debeQuedarseCallada } from '@/lib/cortesia'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 // En pruebas apunta a un doble local de la Graph API. En producción no se
@@ -114,6 +115,24 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
 
     // Nada que responder si el último mensaje no es del cliente.
     if (historial.at(-1)?.autor !== 'cliente') return
+
+    // Una cortesía suelta no pide respuesta.
+    //
+    // `msgs` viene del más nuevo al más viejo, así que [0] es el entrante que
+    // disparó esto. Si es un "gracias", un "listo" o un sticker, y Sofía ya
+    // habló antes en esta conversación, se queda callada.
+    //
+    // Sin esto la despedida no terminaba nunca: en Mia Floristería el cliente
+    // dijo "No, gracias", Sofía cerró bien, él escribió "Gracias" y ella
+    // contestó, él mandó un sticker y ella volvió a contestar repitiendo la
+    // misma frase. Un bot que siempre tiene la última palabra se delata solo,
+    // y cada vuelta cuesta plata.
+    const entrante = msgs?.[0]
+    const yaRespondio = (msgs ?? []).some((m) => m.direction === 'out')
+    if (entrante && debeQuedarseCallada(entrante, yaRespondio)) {
+      console.log('[autoReply] cortesía sin respuesta:', (entrante.body ?? entrante.msg_type)?.slice(0, 40))
+      return
+    }
 
     const lead = (conv.leads ?? {}) as {
       name?: string | null; business_name?: string | null; current_stage?: string | null
