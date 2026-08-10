@@ -109,3 +109,14 @@ export const HANDOFF_PAUSA_BOT = new Set([
 
 /** Etapa a la que pasa un lead en cuanto empieza a conversar con Sofía. */
 export const ETAPA_CONVERSANDO = 'conversando'
+
+/**
+ * El cliente dijo que no.
+ *
+ * Es terminal a propósito: el movimiento de etapas solo avanza por
+ * `sort_order` y perdido es el 99, así que de acá no sale solo. Si alguien
+ * cambia de opinión, Rafael arrastra la tarjeta en el pipeline. Eso es
+ * deliberado — que un "no" se deshaga automáticamente es como se termina
+ * escribiéndole otra vez a quien pidió que no le escriban.
+ */
+export const ETAPA_PERDIDO = 'perdido'

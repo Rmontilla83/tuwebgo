@@ -45,6 +45,9 @@ const STAGE_THEME: Record<string, { border: string; dot: string; bg: string; tab
   esperando_ok:    { border: 'border-t-indigo-400',  dot: 'bg-indigo-400',  bg: 'bg-indigo-50/60',  tabActive: 'bg-indigo-500 text-white' },
   en_produccion:   { border: 'border-t-emerald-500', dot: 'bg-emerald-500', bg: 'bg-emerald-50/60', tabActive: 'bg-emerald-500 text-white' },
   entregado_final: { border: 'border-t-teal-500',    dot: 'bg-teal-500',    bg: 'bg-teal-50/60',    tabActive: 'bg-teal-500 text-white' },
+  // Gris a propósito: es un cierre, no un paso del embudo. Con un color vivo
+  // compite visualmente con las etapas donde sí hay algo que hacer.
+  perdido:         { border: 'border-t-slate-300',   dot: 'bg-slate-400',   bg: 'bg-slate-100/70',  tabActive: 'bg-slate-500 text-white' },
 }
 const PLAN_LABELS: Record<string, string> = { pre_diseno: 'Pre-diseño', landing_page: 'Landing', sitio_web: 'Sitio Web' }
 const SOURCE_LABELS: Record<string, string> = { landing_page: 'Landing', instagram_dm: 'Instagram', referral: 'Referido', meta_ads_direct: 'Meta Ads', organic_wa: 'WhatsApp', other: 'Otro' }
@@ -180,7 +183,21 @@ export default function PipelinePage() {
     return () => { el.removeEventListener('scroll', updateScrollIndicators); ro.disconnect() }
   }, [loading, updateScrollIndicators])
 
-  function scrollBoard(dir: 'left' | 'right') { scrollRef.current?.scrollBy({ left: dir === 'left' ? -300 : 300, behavior: 'smooth' }) }
+  /**
+   * Avanza una columna entera, no 300px fijos.
+   *
+   * Con columnas de 220px, saltar 300 dejaba siempre media columna cortada al
+   * borde: se veía como si el tablero no terminara de llegar. Se mide la
+   * primera columna en vez de asumir su ancho, que es un clamp y cambia con la
+   * pantalla.
+   */
+  function scrollBoard(dir: 'left' | 'right') {
+    const el = scrollRef.current
+    if (!el) return
+    const col = el.firstElementChild as HTMLElement | null
+    const paso = col ? col.getBoundingClientRect().width + 12 : 300
+    el.scrollBy({ left: dir === 'left' ? -paso : paso, behavior: 'smooth' })
+  }
 
   async function moveToStage(leadId: string, newStage: string) {
     const previousStage = leads.find(l => l.id === leadId)?.current_stage
@@ -220,7 +237,17 @@ export default function PipelinePage() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div></div>
 
-  const visibleStages = stages.filter(s => !s.is_lost)
+  // Perdido SÍ se muestra.
+  //
+  // Estaba filtrado con `!s.is_lost`, así que la etapa existía en la base pero
+  // no había forma de verla ni de llegar a ella desde el tablero. Y ahora que
+  // un "No, gracias" manda el lead ahí solo, esconderla significaba que los
+  // rechazos desaparecían de la vista sin dejar rastro.
+  //
+  // Va al final —sort_order 99 ya la deja ahí— y con su propio color apagado:
+  // es un cierre, no un paso del embudo. El pronóstico la sigue excluyendo,
+  // que para eso está `is_lost`.
+  const visibleStages = stages
 
   return (
     <div className="animate-fade-in">

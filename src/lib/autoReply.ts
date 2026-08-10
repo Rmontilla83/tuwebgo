@@ -1,9 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type TurnoConversacion } from '@/lib/gemini'
-import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, HANDOFF_PAUSA_BOT } from '@/lib/config'
+import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, ETAPA_PERDIDO, HANDOFF_PAUSA_BOT } from '@/lib/config'
 import { urlFormulario } from '@/lib/pagos'
 import { avisarPagoReportado } from '@/lib/email/correos'
-import { debeQuedarseCallada } from '@/lib/cortesia'
+import { debeQuedarseCallada, esRechazoExplicito } from '@/lib/cortesia'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 // En pruebas apunta a un doble local de la Graph API. En producción no se
@@ -129,7 +129,22 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
     // y cada vuelta cuesta plata.
     const entrante = msgs?.[0]
     const yaRespondio = (msgs ?? []).some((m) => m.direction === 'out')
-    if (entrante && debeQuedarseCallada(entrante, yaRespondio)) {
+
+    // El rechazo se evalúa ANTES que la cortesía, y no es un detalle: el
+    // botón dice "No, gracias", que son dos palabras de la lista de cortesía.
+    // Sin este orden, tocar ese botón no recibiría ninguna respuesta — y a
+    // alguien que dice que no hay que confirmarle que se le hizo caso.
+    const etapaActual = (conv.leads as { current_stage?: string } | null)?.current_stage
+    const rechaza = !!entrante && esRechazoExplicito(entrante)
+
+    // Un rechazo se responde UNA vez. Si el lead ya está en perdido, la
+    // conversación terminó y no hay nada más que decir.
+    if (rechaza && etapaActual === ETAPA_PERDIDO) {
+      console.log('[autoReply] ya estaba en perdido, sin respuesta')
+      return
+    }
+
+    if (!rechaza && entrante && debeQuedarseCallada(entrante, yaRespondio)) {
       console.log('[autoReply] cortesía sin respuesta:', (entrante.body ?? entrante.msg_type)?.slice(0, 40))
       return
     }
@@ -204,7 +219,13 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
     // Sofía mueve el lead solo en el tramo que ella controla. Lo que viene
     // después de que entra dinero depende de hechos que no puede verificar.
     if (conv.lead_id) {
-      const destino = handoff ? ETAPA_POR_HANDOFF[handoff] : ETAPA_CONVERSANDO
+      // Un "no" manda por encima de todo lo demás. Si no, el lead que acaba
+      // de rechazarnos se movería a "conversando" y volvería a entrar en la
+      // próxima campaña — justo lo que el pie de la plantilla promete que no
+      // va a pasar.
+      const destino = rechaza
+        ? ETAPA_PERDIDO
+        : handoff ? ETAPA_POR_HANDOFF[handoff] : ETAPA_CONVERSANDO
       const actual = (conv.leads as { current_stage?: string } | null)?.current_stage
 
       // Solo avanza, nunca retrocede. Se compara por sort_order y no por una
