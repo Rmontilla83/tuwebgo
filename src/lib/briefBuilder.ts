@@ -108,11 +108,24 @@ function contacto(d: Datos): string {
   return wa ? `WhatsApp +${wa}` : DECIDES
 }
 
+const tieneMaterial = (d: Datos, que: string) =>
+  (Array.isArray(d.material) ? d.material.map(String) : []).some((m) => m.startsWith(que))
+
 function material(d: Datos, que: 'Logo' | 'Fotos'): string {
-  const lista = Array.isArray(d.material) ? d.material.map(String) : []
-  if (!lista.some((m) => m.startsWith(que))) return 'no'
+  if (!tieneMaterial(d, que)) return 'no'
   return que === 'Logo' ? 'sí, el cliente lo envía aparte' : 'sí, el cliente las envía aparte'
 }
+
+/**
+ * El favicon no se le pregunta al cliente: se deduce.
+ *
+ * Si dijo que tiene logo, el favicon sale del logo — es lo que haría
+ * cualquiera. Preguntárselo aparte sería una pregunta más para una respuesta
+ * que ya tenemos, y "favicon" no es una palabra que un panadero deba
+ * aprenderse para pedir su página.
+ */
+const favicon = (d: Datos) =>
+  tieneMaterial(d, 'Logo') ? 'usar el logo del cliente' : DECIDES
 
 export function briefAFormatoBuilder(datos: Datos, negocio: string): string {
   const d = datos ?? {}
@@ -166,7 +179,7 @@ export function briefAFormatoBuilder(datos: Datos, negocio: string): string {
     '## Ronda 4 — Técnico',
     `14. Logo: ${material(d, 'Logo')}`,
     `15. Imágenes: ${material(d, 'Fotos')}`,
-    `16. Favicon: ${DECIDES}`,
+    `16. Favicon: ${favicon(d)}`,
     '17. Idioma: español',
     '18. Deploy: no',
   ]
