@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { esFalloDelContacto } from '@/lib/fallosCampana'
 
 export const runtime = 'nodejs'
 
@@ -44,18 +45,31 @@ export async function GET() {
 
     // Señal propia: qué proporción de los envíos de campaña está fallando.
     // Un salto acá suele adelantarse a que Meta mueva el quality_rating.
+    //
+    // PERO SOLO CUENTAN LOS FALLOS NUESTROS. Antes se sumaban todos y eso
+    // dejó las campañas trancadas sin motivo: 4 números sin WhatsApp y 1
+    // excluido por un experimento de Meta dieron 25% sobre 20 envíos, el
+    // freno corta en 20%, y el botón pasó a "Envío bloqueado" con la
+    // plantilla recién aprobada y todo en orden. Un teléfono publicado en una
+    // ficha de Google no garantiza que tenga WhatsApp: eso es el costo normal
+    // de una lista scrapeada, no una señal de que estemos haciendo algo mal.
     const db = createAdminClient()
-    const [{ count: enviados }, { count: fallidos }] = await Promise.all([
+    const desde = new Date(Date.now() - 7 * 864e5).toISOString()
+    const [{ count: enviados }, { data: filasFallidas }] = await Promise.all([
       db.from('campaign_targets').select('*', { count: 'exact', head: true })
         .in('estado', ['enviado', 'entregado', 'leido', 'respondio'])
-        .gte('enviado_at', new Date(Date.now() - 7 * 864e5).toISOString()),
-      db.from('campaign_targets').select('*', { count: 'exact', head: true })
+        .gte('enviado_at', desde),
+      db.from('campaign_targets').select('error')
         .eq('estado', 'fallido')
-        .gte('creado_at', new Date(Date.now() - 7 * 864e5).toISOString()),
+        .gte('creado_at', desde),
     ])
 
-    const total = (enviados ?? 0) + (fallidos ?? 0)
-    const tasaFallo = total > 0 ? Math.round(((fallidos ?? 0) / total) * 100) : 0
+    const fallidos = filasFallidas?.length ?? 0
+    const fallosContacto = (filasFallidas ?? []).filter((f) => esFalloDelContacto(f.error)).length
+    const fallosSistema = fallidos - fallosContacto
+
+    const total = (enviados ?? 0) + fallosSistema
+    const tasaFallo = total > 0 ? Math.round((fallosSistema / total) * 100) : 0
 
     const calidad: string = d.quality_rating ?? 'UNKNOWN'
     const seguroEnviar = calidad !== 'RED' && tasaFallo < 20
@@ -66,7 +80,10 @@ export async function GET() {
       calidad,
       limite: d.messaging_limit_tier,
       enviados7d: enviados ?? 0,
-      fallidos7d: fallidos ?? 0,
+      fallidos7d: fallidos,
+      /** De esos fallidos, cuántos son números que simplemente no tienen WhatsApp. */
+      fallosContacto,
+      fallosSistema,
       tasaFallo,
       seguroEnviar,
       aviso:
@@ -75,8 +92,12 @@ export async function GET() {
           : calidad === 'YELLOW'
             ? 'La calidad bajó a AMARILLO — hay bloqueos o reportes. Detente, revisa el mensaje y espera a que vuelva a verde.'
             : tasaFallo >= 20
-              ? `${tasaFallo}% de los envíos está fallando. Revisa que la plantilla esté aprobada antes de seguir.`
-              : null,
+              ? `${tasaFallo}% de los envíos falla por algo nuestro. Revisa que la plantilla esté aprobada antes de seguir.`
+              : fallosContacto > 0
+                // No es una alarma, es información sobre la lista. Por eso se
+                // dice aparte y no bloquea nada.
+                ? `${fallosContacto} de ${(enviados ?? 0) + fallidos} números no tienen WhatsApp o Meta no los deja recibir. Normal en una lista scrapeada; no frena la campaña.`
+                : null,
     })
   } catch {
     return NextResponse.json({ error: 'No se pudo consultar el estado del número.' }, { status: 502 })

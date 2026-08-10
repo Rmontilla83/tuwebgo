@@ -163,7 +163,14 @@ export async function POST(request: Request) {
       const datos = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        const detalle: string = datos?.error?.error_user_msg ?? datos?.error?.message ?? `HTTP ${res.status}`
+        // El código va ADELANTE del texto. El mensaje de Meta cambia con el
+        // idioma y con la versión de la API; el código no. Es lo que permite
+        // distinguir después un número sin WhatsApp (131026, culpa del
+        // contacto) de una plantilla sin aprobar (132001, culpa nuestra) sin
+        // adivinar por palabras. Ver lib/fallosCampana.ts.
+        const codigo: number | undefined = datos?.error?.code
+        const texto: string = datos?.error?.error_user_msg ?? datos?.error?.message ?? `HTTP ${res.status}`
+        const detalle: string = codigo ? `[${codigo}] ${texto}` : texto
         await db.from('campaign_targets').update({ estado: 'fallido', error: detalle.slice(0, 300) }).eq('id', t.id)
         fallidos++
 
