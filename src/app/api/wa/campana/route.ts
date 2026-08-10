@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { avisarCampanaTerminada, avisarCampanaDetenida } from '@/lib/email/correos'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PLANTILLAS } from '@/lib/waTemplates'
@@ -318,6 +319,28 @@ export async function POST(request: Request) {
   const { count: restantes } = await db
     .from('campaign_targets').select('*', { count: 'exact', head: true })
     .eq('campaign_id', camp.id).eq('estado', 'pendiente')
+
+  // Avisos por correo. Van con `after()` para no demorar la respuesta: la UI
+  // encadena tandas y cada milisegundo acá se multiplica por lote.
+  //
+  // El de "terminada" solo cuando de verdad no queda nadie en la cola: la UI
+  // llama a esta ruta muchas veces por campaña, y un correo por tanda sería
+  // ocho correos por campaña. El de "detenida" siempre, porque significa que
+  // el envío está parado esperando que alguien lo arregle.
+  after(async () => {
+    if (errorSistematico) {
+      await avisarCampanaDetenida({
+        nombre: camp.name ?? 'Campaña',
+        motivo: errorSistematico,
+        restantes: restantes ?? 0,
+      })
+    } else if ((restantes ?? 0) === 0 && enviados > 0) {
+      await avisarCampanaTerminada({
+        nombre: camp.name ?? 'Campaña',
+        enviados, fallidos, restantes: restantes ?? 0,
+      })
+    }
+  })
 
   return NextResponse.json({
     ok: true, enviados, fallidos,

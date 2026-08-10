@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { esTokenManual, verificarTokenManual } from '@/lib/briefManual'
+import { avisarBriefRecibido, confirmarBriefAlCliente } from '@/lib/email/correos'
 
 export const runtime = 'nodejs'
 
@@ -145,6 +146,30 @@ export async function POST(request: Request) {
       })
       if (msgErr) console.error('[api/brief] aviso en conversación:', msgErr.message)
     }
+
+    const negocio = typeof datos.nombre === 'string' ? datos.nombre : fila.negocio ?? 'Sin nombre'
+
+    // Los correos salen DESPUÉS del insert y con `after()`, con el 200 ya
+    // enviado. El cliente acaba de darle a "Enviar" tras diez pasos: que se
+    // quede mirando una rueda mientras hablamos con Resend es la peor forma
+    // de terminar un formulario. Y si el correo falla, el brief ya está
+    // guardado, que es lo único que no se puede perder.
+    after(async () => {
+      await avisarBriefRecibido({
+        negocio,
+        convId: fila.conversation_id,
+        quePasa: typeof datos.que_hace === 'string' ? datos.que_hace : '',
+        rubro: typeof datos.rubro === 'string' ? datos.rubro : '',
+        manual: !fila.conversation_id,
+      })
+
+      // La confirmación al cliente solo si dejó correo: es opcional en el
+      // formulario. Sin correo no se inventa nada, simplemente no se manda.
+      const correoCliente = typeof datos.email === 'string' ? datos.email.trim() : ''
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correoCliente)) {
+        await confirmarBriefAlCliente({ correo: correoCliente, negocio })
+      }
+    })
 
     return NextResponse.json({ ok: true })
   } catch (e) {

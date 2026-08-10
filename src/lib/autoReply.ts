@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redactarBorrador, type TurnoConversacion } from '@/lib/gemini'
 import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, HANDOFF_PAUSA_BOT } from '@/lib/config'
 import { urlFormulario } from '@/lib/pagos'
+import { avisarPagoReportado } from '@/lib/email/correos'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 // En pruebas apunta a un doble local de la Graph API. En producción no se
@@ -223,6 +224,26 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
         p_con_comprobante: ultimos.some((m) => ['image', 'document', 'audio'].includes(m.msg_type ?? '')),
       })
       if (pagoErr) console.error('[autoReply] registrar pago:', pagoErr.message)
+
+      // Y se avisa por correo. Es plata esperando a que alguien la confirme:
+      // el cliente ya hizo su parte y hasta que no se verifique no arranca
+      // nada. No se espera el resultado ni se propaga un fallo — el pago ya
+      // quedó registrado, que es lo que no se puede perder.
+      const { data: c } = await db
+        .from('wa_conversations')
+        .select('phone_e164, display_name, leads(name, business_name)')
+        .eq('id', convId)
+        .maybeSingle()
+      const lead = Array.isArray(c?.leads) ? c?.leads[0] : c?.leads
+      await avisarPagoReportado({
+        convId,
+        quien:
+          lead?.name?.trim() || c?.display_name?.trim() || lead?.business_name?.trim() ||
+          (c?.phone_e164 ? `+${c.phone_e164}` : 'Cliente sin nombre'),
+        telefono: c?.phone_e164 ?? null,
+        texto: ultimos.find((m) => m.body?.trim())?.body ?? null,
+        conComprobante: ultimos.some((m) => ['image', 'document', 'audio'].includes(m.msg_type ?? '')),
+      })
     }
 
     // No toda señal aparta al bot. "quiere_comprar" mueve la etapa pero Sofía

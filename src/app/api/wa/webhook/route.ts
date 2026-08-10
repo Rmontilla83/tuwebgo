@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractRefCode } from '@/lib/whatsapp'
 import { after } from 'next/server'
+import { revisarSla } from '@/lib/sla'
 import { responderAutomatico } from '@/lib/autoReply'
 import { descargarMedia, transcribirAudio } from '@/lib/waMedia'
 
@@ -310,6 +311,13 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
         await procesarAudio(db, m.id, media.id)
       }
       await responderAutomatico(db, convId as string)
+
+      // Se aprovecha el viaje para revisar el SLA. No reemplaza al cron: si
+      // nadie escribe, esto no corre — y el caso tipico del SLA es justo el
+      // silencio. Lo que cubre es el otro: mientras HAY trafico, un cliente
+      // olvidado en otra conversacion se detecta sin esperar al cron. Es
+      // idempotente, asi que llamarlo de mas no manda correos de mas.
+      await revisarSla(db)
     } catch (e) {
       console.error('[wa-webhook] trabajo diferido:', e instanceof Error ? e.message : e)
     }
