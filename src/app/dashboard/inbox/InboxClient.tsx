@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatPhoneVE, templatesForStage, waLink } from '@/lib/whatsapp'
+import { formatPhoneVE, templatesForStage } from '@/lib/whatsapp'
 import { PLANTILLAS, type PlantillaWA } from '@/lib/waTemplates'
 import { paramsDePlantilla } from '@/lib/plantillaParams'
 import { ICONO_HANDOFF, IconChat, IconCerrar, IconAsistente, IconUsuario, IconMano, IconFlecha, IconEnlaceExterno, IconLista, IconTelefono } from '@/components/icons'
@@ -407,17 +407,20 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
     }
   }
 
-  /** Abre wa.me y deja constancia. Respaldo para cuando la Cloud API no puede enviar. */
-  async function enviarPorDeeplink(texto: string) {
-    const link = waLink(conv!.phone_e164, texto)
-    if (!link) { setError('El teléfono de la conversación no es válido.'); return }
-    // window.open síncrono ANTES del await, o el navegador bloquea el popup.
-    window.open(link, '_blank', 'noopener,noreferrer')
-    const { error: err } = await supabase.rpc('wa_log_deeplink', {
-      p_phone: conv!.phone_e164, p_body: texto, p_lead_id: conv!.lead_id, p_template: null,
-    })
-    if (err) setError(`Se abrió WhatsApp pero no se registró el mensaje: ${err.message}`)
-  }
+  /* Acá vivía `enviarPorDeeplink`, que abría wa.me con el texto escrito para
+     mandarlo a mano cuando la ventana estaba cerrada. Se eliminó por decisión
+     de Rafael, y tiene razón:
+
+     Un número registrado en la Cloud API deja de poder usarse en la app de
+     WhatsApp. O sea que ese wa.me salía SIEMPRE desde su número personal, no
+     desde el del negocio. El cliente recibía un mensaje de un número distinto
+     al que le venía escribiendo —que es justo lo que hace un estafador— y su
+     respuesta se iba al teléfono de Rafael: nunca al inbox, nunca a Sofía,
+     nunca a una métrica. La conversación quedaba partida en dos.
+
+     Fuera de la ventana de 24h se manda una plantilla aprobada o no se manda
+     nada. Los mensajes viejos con channel 'deeplink' se siguen mostrando, con
+     su icono, porque son historia real de lo que se hizo. */
 
   /** Envía una plantilla aprobada. Es la única vía fuera de la ventana de 24h. */
   async function enviarPlantilla(p: PlantillaWA) {
@@ -463,10 +466,11 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
     const texto = borrador.trim()
     setError(null)
 
-    // Sin ventana abierta la API rechaza el texto libre, así que ni lo intentamos.
+    // Sin ventana abierta la API rechaza el texto libre. El cuadro de escribir
+    // ni siquiera se muestra en ese caso, así que esto es un cinturón: si
+    // alguien llega acá con la ventana cerrada, se dice y no se intenta.
     if (!v.abierta) {
-      setBorrador('')
-      await enviarPorDeeplink(texto)
+      setError('La ventana está cerrada. Solo se puede mandar una plantilla aprobada.')
       return
     }
 
@@ -485,16 +489,20 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
         return
       }
 
-      // 503 = faltan credenciales de Meta · 409 = ventana cerrada.
-      // En ambos casos el deep-link sigue funcionando, así que no te quedas trancado.
-      if (res.status === 503 || data.codigo === 'VENTANA_CERRADA') {
-        setBorrador('')
-        await enviarPorDeeplink(texto)
+      // 503 = faltan credenciales de Meta · 409 = la ventana se cerró entre que
+      // se cargó la pantalla y se tocó Enviar. Ya no hay respaldo por wa.me, así
+      // que se dice qué pasó y qué hacer, en vez de fallar seco.
+      if (data.codigo === 'VENTANA_CERRADA') {
+        setError('La ventana se cerró mientras escribías. Manda una plantilla aprobada desde el desplegable.')
+        return
+      }
+      if (res.status === 503) {
+        setError('Faltan las credenciales de WhatsApp en el servidor. Revisa la configuración.')
         return
       }
       setError(data.error ?? `Error ${res.status}`)
     } catch {
-      setError('No se pudo conectar. Intentá de nuevo.')
+      setError('No se pudo conectar. Inténtalo de nuevo.')
     } finally {
       setEnviando(false)
     }
@@ -859,6 +867,17 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                   </div>
                 )}
 
+                {/*
+                  Todo el compositor de texto libre solo existe con la ventana
+                  abierta. Con la ventana cerrada no hay forma de mandarlo, así
+                  que un cuadro para escribir —más el botón de Sugerir y los
+                  atajos, que lo único que hacen es llenarlo— era una promesa
+                  falsa: se escribía el mensaje y no había cómo enviarlo.
+
+                  De paso devuelve unos 86px al chat en el teléfono, que es
+                  donde más falta hacen.
+                */}
+                {v.abierta && (
                 <div className="flex gap-2 mb-2 overflow-x-auto items-center" style={{ scrollbarWidth: 'none' }}>
                   <button
                     onClick={sugerir}
@@ -883,6 +902,9 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                     </button>
                   ))}
                 </div>
+                )}
+
+                {v.abierta && (
                 <div className="flex gap-2 items-end">
                   <textarea
                     value={borrador}
@@ -895,12 +917,13 @@ export default function InboxClient({ initial, etapas = [] }: { initial: Convers
                   <button
                     onClick={enviar}
                     disabled={!borrador.trim() || enviando}
-                    title={v.abierta ? 'Se envía por la API de WhatsApp' : 'Ventana cerrada: se abre WhatsApp para que lo mandes tú'}
+                    title="Se envía por la API de WhatsApp, desde el número del negocio"
                     className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold font-[family-name:var(--font-display)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98] whitespace-nowrap"
                   >
-                    {enviando ? 'Enviando…' : v.abierta ? 'Enviar' : 'Abrir WA'}
+                    {enviando ? 'Enviando…' : 'Enviar'}
                   </button>
                 </div>
+                )}
               </div>
             </>
           )}
