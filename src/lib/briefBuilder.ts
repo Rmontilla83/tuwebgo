@@ -127,6 +127,34 @@ function material(d: Datos, que: 'Logo' | 'Fotos'): string {
 const favicon = (d: Datos) =>
   tieneMaterial(d, 'Logo') ? 'usar el logo del cliente' : DECIDES
 
+/**
+ * La dirección donde va a vivir la página, ya resuelta.
+ *
+ * El formulario acepta las dos cosas en el mismo campo: "tunegocio" para el
+ * subdominio gratis, o "midominio.com" si el cliente ya tiene uno. Se
+ * distingue por el punto, igual que hace el resumen del formulario.
+ *
+ * Va en la línea 18 y no solo en el contexto adicional porque es lo que el
+ * constructor tiene que EJECUTAR al final. Enterrado entre notas, se lee como
+ * un dato de color y la página termina en una URL descartable.
+ */
+export function dominioDestino(d: Datos): string | null {
+  const sub = txt(d.subdominio)
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .trim()
+  if (!sub) return null
+  return sub.includes('.') ? sub : `${sub}.tuwebgo.net`
+}
+
+function deploy(d: Datos): string {
+  const dom = dominioDestino(d)
+  return dom
+    ? `sí, a ${dom} en Netlify (equipo "wuipi web")`
+    : 'sí, en Netlify. El cliente no pidió dirección: usa <negocio>.tuwebgo.net'
+}
+
 export function briefAFormatoBuilder(datos: Datos, negocio: string): string {
   const d = datos ?? {}
 
@@ -181,7 +209,7 @@ export function briefAFormatoBuilder(datos: Datos, negocio: string): string {
     `15. Imágenes: ${material(d, 'Fotos')}`,
     `16. Favicon: ${favicon(d)}`,
     '17. Idioma: español',
-    '18. Deploy: no',
+    `18. Deploy: ${deploy(d)}`,
   ]
 
   // Todo lo que el formulario recogió y la plantilla no contempla. Va como
@@ -194,7 +222,7 @@ export function briefAFormatoBuilder(datos: Datos, negocio: string): string {
     ['Dirección', txt(d.direccion)],
     ['Horario', txt(d.horario)],
     ['WhatsApp', txt(d.whatsapp) && `+${txt(d.whatsapp).replace(/\D/g, '')}`],
-    ['Subdominio pedido', txt(d.subdominio)],
+    ['Dirección pedida (textual)', txt(d.subdominio)],
     ['Notas del cliente', txt(d.notas)],
     // Solo cuando cayó en 'otro' por no tener equivalente. Si el cliente
     // eligió literalmente "Otro", repetirlo no agrega nada.
