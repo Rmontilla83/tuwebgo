@@ -233,9 +233,22 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
       // dejó esto muerto sin que nadie lo notara.
       const { data: ord } = await db.from('pipeline_stages').select('slug, sort_order')
       const orden = new Map((ord ?? []).map((e) => [e.slug, e.sort_order]))
+
+      // LA EXCEPCIÓN: un perdido que vuelve a escribir.
+      //
+      // Perdido es el 99, así que la regla de "solo avanza" lo dejaría ahí
+      // para siempre. Pero el motivo de perdido es que NOSOTROS no le
+      // escribamos, y si es él quien escribe ese motivo desaparece: nadie lo
+      // está molestando, está buscando. Dejarlo en perdido sería tener a un
+      // interesado archivado como descartado.
+      //
+      // Llegar hasta acá ya implica que no fue un rechazo ni una cortesía
+      // suelta: los dos cortan antes. O sea que dijo algo de verdad.
+      const volviendoDePerdido = actual === ETAPA_PERDIDO && !rechaza
+
       const puedeMover =
         !!destino && destino !== actual &&
-        (orden.get(destino) ?? 0) > (orden.get(actual ?? '') ?? 99)
+        (volviendoDePerdido || (orden.get(destino) ?? 0) > (orden.get(actual ?? '') ?? 99))
 
       if (puedeMover) {
         const { error: etErr } = await db.from('leads')

@@ -107,7 +107,24 @@ export const HANDOFF_PAUSA_BOT = new Set([
   'pide_humano',
 ])
 
-/** Etapa a la que pasa un lead en cuanto empieza a conversar con Sofía. */
+/**
+ * Le escribimos y todavía no contestó nada.
+ *
+ * Antes esto no existía y una campaña mandaba el lead directo a
+ * "conversando". El resultado: 36 leads en conversando de los que solo 6
+ * habían escrito alguna vez. La etapa decía "estoy hablando con 36 personas"
+ * cuando la verdad era 6, y no había forma de ver la tasa de respuesta ni de
+ * armar el segmento para `segundo_intento` — que es exactamente "los que
+ * contacté y no me contestaron".
+ */
+export const ETAPA_CONTACTADO = 'contactado'
+
+/**
+ * Etapa a la que pasa un lead cuando DE VERDAD interactúa.
+ *
+ * La mueve una respuesta del cliente, no un envío nuestro. Un mensaje que
+ * mandamos no es una conversación.
+ */
 export const ETAPA_CONVERSANDO = 'conversando'
 
 /**

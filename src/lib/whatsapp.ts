@@ -147,7 +147,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'primer_contacto',
     label: 'Primer contacto',
-    stages: ['conversando'],
+    stages: ['contactado', 'conversando'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}! Soy Rafael de TuWebGo\n\n` +
@@ -158,7 +158,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'seguimiento',
     label: 'Seguimiento',
-    stages: ['conversando'],
+    stages: ['contactado', 'conversando'],
     metaCategory: 'UTILITY',
     build: (v) =>
       `${saludo(v)}, ¿cómo va todo?\n\n` +
@@ -199,7 +199,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     id: 'reactivacion',
     label: 'Reactivación',
-    stages: ['perdido', 'conversando'],
+    stages: ['perdido', 'contactado', 'conversando'],
     metaCategory: 'MARKETING',
     build: (v) =>
       `${saludo(v)}! ¿Cómo va${v.negocio ? ` ${v.negocio}` : ''}?\n\n` +

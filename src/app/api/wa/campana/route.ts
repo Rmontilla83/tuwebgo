@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PLANTILLAS } from '@/lib/waTemplates'
 import { paramsDePlantilla, type LeadParaPlantilla } from '@/lib/plantillaParams'
+import { ETAPA_CONTACTADO } from '@/lib/config'
 
 export const runtime = 'nodejs'
 
@@ -219,9 +220,11 @@ export async function POST(request: Request) {
         .update({ estado: 'enviado', wamid: wamid ?? null, enviado_at: new Date().toISOString(), error: null })
         .eq('id', t.id)
 
-      // El contacto deja de estar "sin contactar" en el momento en que se le
-      // escribe: si no, el pipeline sigue diciendo que nadie lo tocó.
-      await db.from('leads').update({ current_stage: 'conversando' })
+      // Pasa a CONTACTADO, no a conversando: le escribimos, todavía no dijo
+      // nada. Marcarlo como conversando daba un embudo que mentía —36 en
+      // "conversando" con 6 respuestas reales— y borraba el único segmento
+      // que importa para reintentar: a quién le escribí y no me contestó.
+      await db.from('leads').update({ current_stage: ETAPA_CONTACTADO })
         .eq('id', t.lead_id).eq('current_stage', 'sin_contactar')
 
       enviados++

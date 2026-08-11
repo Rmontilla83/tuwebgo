@@ -39,6 +39,9 @@ type Activity = { id: number; lead_id: string; activity_type: string; content: s
 type Transition = { from_stage: string | null; to_stage: string; transitioned_at: string }
 
 const STAGE_THEME: Record<string, { border: string; dot: string; bg: string; tabActive: string }> = {
+  // Contactado: le escribimos y no ha dicho nada. Tono apagado a proposito,
+  // no es una conversacion todavia.
+  contactado:      { border: 'border-t-sky-300',     dot: 'bg-sky-300',     bg: 'bg-sky-50/50',     tabActive: 'bg-sky-400 text-white' },
   conversando:     { border: 'border-t-blue-400',    dot: 'bg-blue-400',    bg: 'bg-blue-50/60',    tabActive: 'bg-blue-500 text-white' },
   por_cobrar:      { border: 'border-t-amber-400',   dot: 'bg-amber-400',   bg: 'bg-amber-50/60',   tabActive: 'bg-amber-500 text-white' },
   prediseno_curso: { border: 'border-t-purple-400',  dot: 'bg-purple-400',  bg: 'bg-purple-50/60',  tabActive: 'bg-purple-500 text-white' },
@@ -74,7 +77,10 @@ function getDealAge(date: string): { text: string; days: number } {
 function rottingLevel(days: number, stage: string): 'ok' | 'warm' | 'hot' {
   // Días de tolerancia por etapa. 'Por cobrar' es el más corto a propósito: es
   // el momento donde se gana o se pierde la venta.
-  const thresholds: Record<string, number> = { conversando: 2, por_cobrar: 1, prediseno_curso: 2, esperando_ok: 3, en_produccion: 5, entregado_final: 7 }
+  const thresholds: Record<string, number> = {
+    // Contactado y en silencio: a los 4 dias ya es candidato al segundo intento.
+    contactado: 4,
+    conversando: 2, por_cobrar: 1, prediseno_curso: 2, esperando_ok: 3, en_produccion: 5, entregado_final: 7 }
   const limit = thresholds[stage] || 3
   if (days >= limit * 2) return 'hot'
   if (days >= limit) return 'warm'
