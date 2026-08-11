@@ -30,6 +30,8 @@ export default function CampanaWhatsApp() {
   const [conteos, setConteos] = useState<Record<string, number>>({})
   const [campanas, setCampanas] = useState<Progreso[]>([])
   const [iniciadasHoy, setIniciadasHoy] = useState(0)
+  /** Tope diario de cada campaña. `v_campana_progreso` no lo trae. */
+  const [topes, setTopes] = useState<Record<string, number>>({})
   const [salud, setSalud] = useState<{ calidad: string; limite?: string; tasaFallo: number; seguroEnviar: boolean; aviso: string | null } | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,12 +55,13 @@ export default function CampanaWhatsApp() {
   const [avance, setAvance] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    const [et, ld, cp, ini, seg] = await Promise.all([
+    const [et, ld, cp, ini, seg, tps] = await Promise.all([
       supabase.from('pipeline_stages').select('slug, label, sort_order').eq('is_lost', false).order('sort_order'),
       supabase.from('leads').select('current_stage').eq('es_prueba', false).not('phone_e164', 'is', null),
       supabase.from('v_campana_progreso').select('*'),
       supabase.rpc('wa_iniciadas_hoy'),
       supabase.rpc('segmentos_disponibles'),
+      supabase.from('campaigns').select('id, enviados_por_dia'),
     ])
     if (et.error || ld.error || cp.error) {
       setError(et.error?.message ?? ld.error?.message ?? cp.error?.message ?? null)
@@ -70,6 +73,10 @@ export default function CampanaWhatsApp() {
     setConteos(c)
     setCampanas((cp.data as Progreso[]) ?? [])
     setIniciadasHoy(Number(ini.data ?? 0))
+    setTopes(Object.fromEntries(
+      ((tps.data ?? []) as { id: string; enviados_por_dia: number | null }[])
+        .map((c) => [c.id, c.enviados_por_dia ?? LIMITE_META])
+    ))
 
     // Salud del número: es lo que decide si se puede seguir enviando en frío.
     try {
@@ -95,8 +102,26 @@ export default function CampanaWhatsApp() {
   // Lo que REALMENTE va a entrar en cola: el segmento, recortado por "cuántos".
   const alcance = cuantos > 0 ? Math.min(cuantos, enSegmento) : enSegmento
   const plantillaSel = PLANTILLAS.find((p) => p.name === plantilla)
-  const cupoRestante = Math.max(0, Math.min(tope, LIMITE_META) - iniciadasHoy)
-  const dias = cupoRestante > 0 ? Math.ceil(alcance / Math.min(tope, LIMITE_META)) : 0
+  /**
+   * Dos cupos distintos, que estaban mezclados en uno y el botón mentía.
+   *
+   * `tope` es el deslizador del formulario de campaña NUEVA (por defecto 200).
+   * Se estaba usando también para calcular cuánto puede enviar una campaña YA
+   * creada, así que un botón anunciaba "Enviar 135" cuando el servidor iba a
+   * mandar 30 y cortar. La cuenta buena estaba del lado del servidor —no se
+   * envió de más— pero el número en pantalla era falso.
+   *
+   *  · cupoMeta      — lo que queda del límite de Meta para el NÚMERO. Es
+   *                    global y es lo que muestra la tarjeta de arriba.
+   *  · cupoDe(camp)  — lo que puede enviar ESA campaña: su propio tope diario
+   *                    menos lo ya iniciado. Es la fórmula del servidor.
+   */
+  const cupoMeta = Math.max(0, LIMITE_META - iniciadasHoy)
+  const cupoDe = (campaignId: string) => {
+    const t = topes[campaignId] ?? LIMITE_META
+    return Math.max(0, Math.min(t, LIMITE_META) - iniciadasHoy)
+  }
+  const dias = cupoMeta > 0 ? Math.ceil(alcance / Math.min(tope, LIMITE_META)) : 0
   const costoAprox = plantillaSel
     ? (alcance * parseFloat(COSTO_APROX[plantillaSel.category].replace('$', '').replace(',', '.'))).toFixed(2)
     : '0'
@@ -215,7 +240,7 @@ export default function CampanaWhatsApp() {
 
       {/* ── Cupo del día ── */}
       <div className={`rounded-2xl p-4 border ${
-        cupoRestante === 0 ? 'bg-red-50 border-red-200' : 'bg-[var(--card)] border-[var(--border)]'
+        cupoMeta === 0 ? 'bg-red-50 border-red-200' : 'bg-[var(--card)] border-[var(--border)]'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -226,8 +251,8 @@ export default function CampanaWhatsApp() {
               {iniciadasHoy} <span className="text-base font-medium text-[var(--text-muted)]">de {LIMITE_META}</span>
             </p>
             <p className="text-xs text-[var(--text-secondary)] mt-1">
-              {cupoRestante > 0
-                ? `Puedes iniciar ${cupoRestante} conversaciones más hoy.`
+              {cupoMeta > 0
+                ? `Puedes iniciar ${cupoMeta} conversaciones más hoy.`
                 : 'Cupo agotado. Se libera a medida que pasan las 24 h de cada envío.'}
             </p>
           </div>
@@ -235,7 +260,7 @@ export default function CampanaWhatsApp() {
             <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" strokeWidth="3" />
               <circle cx="18" cy="18" r="15.9" fill="none" strokeWidth="3" strokeLinecap="round"
-                stroke={cupoRestante === 0 ? '#DC2626' : 'var(--primary)'}
+                stroke={cupoMeta === 0 ? '#DC2626' : 'var(--primary)'}
                 strokeDasharray={`${Math.min(100, (iniciadasHoy / LIMITE_META) * 100)} 100`} />
             </svg>
           </div>
@@ -270,10 +295,10 @@ export default function CampanaWhatsApp() {
               {c.pendientes > 0 && (
                 <button
                   onClick={() => lanzar(c.campaign_id)}
-                  disabled={enviando !== null || cupoRestante === 0 || salud?.seguroEnviar === false}
+                  disabled={enviando !== null || cupoDe(c.campaign_id) === 0 || salud?.seguroEnviar === false}
                   className="px-4 py-3 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 transition-all"
                 >
-                  {enviando === c.campaign_id ? 'Enviando…' : salud?.seguroEnviar === false ? 'Envío bloqueado' : `Enviar ${Math.min(c.pendientes, cupoRestante)}`}
+                  {enviando === c.campaign_id ? 'Enviando…' : salud?.seguroEnviar === false ? 'Envío bloqueado' : `Enviar ${Math.min(c.pendientes, cupoDe(c.campaign_id))}`}
                 </button>
               )}
             </div>
