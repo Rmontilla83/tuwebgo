@@ -67,7 +67,7 @@
           fill="white" stroke="none"/>
   </g>
 
-  <!-- Subtle bottom text "TW" watermark -->
+  <!-- Marca de agua inferior: TuWebGo -->
   <text x="256" y="420" text-anchor="middle" font-family="'Space Grotesk','SF Pro Display',system-ui,sans-serif"
-        font-size="48" font-weight="700" fill="white" opacity="0.12" letter-spacing="16">TUWEBGO</text>
+        font-size="48" font-weight="700" fill="white" opacity="0.12" letter-spacing="9">TuWebGo</text>
 </svg>

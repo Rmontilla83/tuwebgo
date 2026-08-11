@@ -107,7 +107,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-[10px] text-white/15 mt-8 font-[family-name:var(--font-display)] tracking-wider">
-          TUWEBGO.NET &mdash; SISTEMA INTERNO
+          TuWebGo.net &mdash; SISTEMA INTERNO
         </p>
       </div>
     </div>
