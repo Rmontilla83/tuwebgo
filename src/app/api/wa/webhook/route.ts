@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { extractRefCode } from '@/lib/whatsapp'
 import { after } from 'next/server'
 import { revisarSla } from '@/lib/sla'
+import { esAutorespuesta } from '@/lib/autorespuesta'
 import { responderAutomatico } from '@/lib/autoReply'
 import { descargarMedia, transcribirAudio } from '@/lib/waMedia'
 
@@ -219,6 +220,35 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
   const esBoton = m.type === 'button' || m.type === 'interactive'
   const tipo = esBoton ? 'text' : TIPOS_CONOCIDOS.has(m.type) ? m.type : 'unsupported'
 
+  /**
+   * El autorespondedor de un negocio no cuenta como respuesta.
+   *
+   * `trg_campana_respondio` marca `campaign_targets.estado = 'respondio'` con
+   * CUALQUIER entrante. Con casi todos los contactos usando WhatsApp Business,
+   * el panel decía 26 respuestas cuando de verdad eran 3 — el mismo tipo de
+   * número inflado que ya dio un embudo del 916% y un pronóstico de $8.070.
+   * En frío, la tasa de respuesta es LA métrica; si miente, no hay con qué
+   * decidir si una plantilla funciona.
+   *
+   * El trigger vive en la base y no hay forma de migrarlo desde acá, así que
+   * se guarda el estado ANTES de insertar y se restaura después. Se lee el
+   * valor real en vez de asumir uno: poner 'leido' a ciegas inflaría las
+   * lecturas de los que solo estaban en 'enviado'.
+   */
+  const autoresp = esAutorespuesta({ body: cuerpo, msg_type: tipo })
+  let estadoPrevio: { id: string; estado: string } | null = null
+  if (autoresp) {
+    const { data: conv } = await db
+      .from('wa_conversations').select('lead_id').eq('id', convId).maybeSingle()
+    if (conv?.lead_id) {
+      const { data: t } = await db
+        .from('campaign_targets').select('id, estado')
+        .eq('lead_id', conv.lead_id).neq('estado', 'respondio')
+        .order('creado_at', { ascending: false }).limit(1).maybeSingle()
+      if (t) estadoPrevio = t as { id: string; estado: string }
+    }
+  }
+
   // ON CONFLICT sobre wamid: Meta reintenta el mismo mensaje hasta 36h.
   const { error: msgErr } = await db
     .from('wa_messages')
@@ -243,6 +273,13 @@ async function guardarEntrante(db: Db, m: MetaMensaje, nombrePerfil: string | nu
       { onConflict: 'wamid', ignoreDuplicates: true }
     )
   if (msgErr) throw new Error(`No se pudo guardar el mensaje: ${msgErr.message}`)
+
+  // Deshacer lo que hizo el trigger: esto no fue una respuesta.
+  if (estadoPrevio) {
+    const { error } = await db.from('campaign_targets')
+      .update({ estado: estadoPrevio.estado }).eq('id', estadoPrevio.id)
+    if (error) console.error('[wa-webhook] restaurar estado del target:', error.message)
+  }
 
   const parche: Record<string, unknown> = {}
   if (nombrePerfil) parche.display_name = nombrePerfil

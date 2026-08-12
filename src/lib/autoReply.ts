@@ -4,6 +4,7 @@ import { ETAPA_POR_HANDOFF, ETAPA_CONVERSANDO, ETAPA_PERDIDO, HANDOFF_PAUSA_BOT 
 import { urlFormulario } from '@/lib/pagos'
 import { avisarPagoReportado } from '@/lib/email/correos'
 import { debeQuedarseCallada, esRechazoExplicito } from '@/lib/cortesia'
+import { esAutorespuesta } from '@/lib/autorespuesta'
 
 const GRAPH = process.env.GRAPH_API_VERSION || 'v26.0'
 // En pruebas apunta a un doble local de la Graph API. En producción no se
@@ -141,6 +142,21 @@ export async function responderAutomatico(db: Db, convId: string): Promise<void>
     // conversación terminó y no hay nada más que decir.
     if (rechaza && etapaActual === ETAPA_PERDIDO) {
       console.log('[autoReply] ya estaba en perdido, sin respuesta')
+      return
+    }
+
+    // El autorespondedor del negocio no es una persona.
+    //
+    // Casi todos los contactos de la lista tienen WhatsApp Business con
+    // respuesta automática, y Sofía se ponía a conversar con ellos: de sus 35
+    // respuestas, unas 24 fueron a robots. A cuatro negocios les escribió DOS
+    // veces porque el autorespondedor disparó dos veces — y el dueño abre el
+    // chat al otro día y ve dos mensajes nuestros que nadie pidió.
+    //
+    // Va después del rechazo por si un autorespondedor incluyera un "no
+    // gracias", que se toma como rechazo igual.
+    if (!rechaza && entrante && esAutorespuesta(entrante)) {
+      console.log('[autoReply] autorespuesta del negocio, sin contestar:', (entrante.body ?? '').slice(0, 50))
       return
     }
 
