@@ -2,6 +2,7 @@ import { enviarCorreo, EQUIPO } from '@/lib/email/enviar'
 import type { Correo } from '@/lib/email/plantilla'
 import { SITIO } from '@/lib/config'
 import { formatPhoneVE, waLink } from '@/lib/whatsapp'
+import type { TurnoWeb } from '@/lib/firmaConversacion'
 
 /**
  * Los correos concretos que manda el sistema.
@@ -294,6 +295,7 @@ const ORIGEN_LEGIBLE: Record<string, string> = {
   footer_link: 'Pie de página',
   floating: 'Botón flotante',
   enlace: 'Enlace directo a #contacto',
+  asistente: 'Chat con Sofía en la web',
 }
 
 export type ContactoWeb = {
@@ -313,6 +315,8 @@ export type ContactoWeb = {
   etapaPrevia: string | null
   /** false si la base falló y este correo es lo único que quedó del contacto. */
   guardado: boolean
+  /** La conversación con Sofía en la web, ya verificada por firma. */
+  conversacion?: TurnoWeb[] | null
 }
 
 /**
@@ -351,7 +355,9 @@ export function avisarContactoWeb(c: ContactoWeb) {
       ...(c.guardado
         ? []
         : ['Ojo: no se pudo guardar en el CRM. Este correo es lo único que quedó de este contacto.']),
-      `Llenó el formulario de tuwebgo.net${c.idioma === 'en' ? ' desde la versión en inglés' : ''}. No pasó por WhatsApp ni por Sofía, así que nadie le ha respondido todavía.`,
+      c.conversacion?.length
+        ? `Conversó con Sofía en tuwebgo.net${c.idioma === 'en' ? ' (versión en inglés)' : ''} y dejó sus datos. Sofía le resolvió dudas pero no da datos de pago: el siguiente paso es tuyo. La conversación está abajo.`
+        : `Llenó el formulario de tuwebgo.net${c.idioma === 'en' ? ' desde la versión en inglés' : ''}. No pasó por WhatsApp ni por Sofía, así que nadie le ha respondido todavía.`,
       whatsapp
         ? 'El botón abre tu WhatsApp con un saludo listo para mandarle.'
         : c.telefono
@@ -374,6 +380,8 @@ export function avisarContactoWeb(c: ContactoWeb) {
             : 'Contacto nuevo',
       ],
       c.origen ? ['Botón que usó', ORIGEN_LEGIBLE[c.origen] ?? c.origen] : null,
+      // Lo último de la conversación, que es lo que sirve para abordarlo.
+      ...(c.conversacion ?? []).slice(-12).map((t) => [t.rol === 'sofia' ? 'Sofía' : 'Visitante', t.texto.slice(0, 500)]),
     ].filter(Boolean) as [string, string][],
     boton,
     enlace: { texto: 'Ver el pipeline', url: `${PORTAL}/dashboard/pipeline` },
@@ -384,7 +392,7 @@ export function avisarContactoWeb(c: ContactoWeb) {
 
   return enviarCorreo({
     para: DESTINO_CONTACTO_WEB,
-    asunto: `Contacto web · ${c.nombre}${c.negocio ? ` · ${c.negocio}` : ''}`,
+    asunto: `${c.conversacion?.length ? 'Interesado desde el chat' : 'Contacto web'} · ${c.nombre}${c.negocio ? ` · ${c.negocio}` : ''}`,
     correo,
     etiqueta: 'contacto_web',
     // Responder desde Gmail le escribe al cliente, no a hola@tuwebgo.net.

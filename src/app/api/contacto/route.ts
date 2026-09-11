@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizePhoneVE } from '@/lib/whatsapp'
 import { ETAPA_CONTACTADO, ETAPA_CONVERSANDO, ETAPA_PERDIDO } from '@/lib/config'
 import { avisarContactoWeb, confirmarContactoAlCliente, type ContactoWeb } from '@/lib/email/correos'
+import { cabecerasCors, origenPermitido } from '@/lib/corsLanding'
+import { verificarConversacion } from '@/lib/firmaConversacion'
 
 export const runtime = 'nodejs'
 
@@ -31,34 +33,8 @@ export const runtime = 'nodejs'
  *     a direcciones ajenas, se quemaría la reputación de envío de todos.
  */
 
-/* ── CORS ────────────────────────────────────────────────────────────── */
-
-const ORIGENES = new Set(['https://tuwebgo.net', 'https://www.tuwebgo.net'])
-
-function origenPermitido(origin: string | null): string | null {
-  if (!origin) return null
-  if (ORIGENES.has(origin)) return origin
-  // Para probar la landing servida en local contra `next dev`.
-  if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    return origin
-  }
-  return null
-}
-
-function cabeceras(origin: string | null): Record<string, string> {
-  const permitido = origenPermitido(origin)
-  if (!permitido) return { Vary: 'Origin' }
-  return {
-    'Access-Control-Allow-Origin': permitido,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400',
-    Vary: 'Origin',
-  }
-}
-
 export function OPTIONS(request: Request) {
-  return new Response(null, { status: 204, headers: cabeceras(request.headers.get('origin')) })
+  return new Response(null, { status: 204, headers: cabecerasCors(request.headers.get('origin')) })
 }
 
 /* ── Límites ─────────────────────────────────────────────────────────── */
@@ -179,7 +155,7 @@ type Existente = {
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin')
-  const headers = cabeceras(origin)
+  const headers = cabecerasCors(origin)
   const responder = (cuerpo: { ok: boolean; error?: string }, status = 200) =>
     NextResponse.json(cuerpo, { status, headers })
 
@@ -236,6 +212,9 @@ export async function POST(request: Request) {
     typeof crudo.session_id === 'string' && UUID.test(crudo.session_id) ? crudo.session_id : null
   const refCode =
     typeof crudo.ref_code === 'string' && /^TW-[a-z0-9]{4,8}$/i.test(crudo.ref_code) ? crudo.ref_code : null
+  // La conversación con Sofía, si la hubo. Solo firmada: sin firma cualquiera
+  // le mandaría a Rafael una "conversación" inventada.
+  const conversacion = sesion ? verificarConversacion(sesion, crudo.turnos, crudo.firma) : null
 
   // Las mismas reglas que el navegador: el navegador es del cliente y
   // cualquiera puede saltarse el formulario y postear a mano.
@@ -263,6 +242,7 @@ export async function POST(request: Request) {
     mensaje,
     idioma,
     origen,
+    conversacion,
   }
 
   const db = createAdminClient()
@@ -359,6 +339,9 @@ export async function POST(request: Request) {
     telefonoGuardado && `Teléfono: ${telefonoGuardado}`,
     correo && `Correo: ${correo}`,
     mensaje && `Mensaje: ${mensaje}`,
+    conversacion?.length &&
+      'Conversación con Sofía en la web:\n' +
+        conversacion.map((t) => `${t.rol === 'sofia' ? 'Sofía' : 'Visitante'}: ${t.texto}`).join('\n').slice(-4000),
   ].filter(Boolean).join('\n')
 
   const { error: actErr } = await db.from('lead_activities')
