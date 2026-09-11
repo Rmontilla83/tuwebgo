@@ -78,6 +78,8 @@ export type Correo = {
   /** Filas de datos, en orden. Los valores se escapan. */
   datos?: [string, string][]
   boton?: { texto: string; url: string }
+  /** Enlace en texto debajo del botón, para la acción que no es la principal. */
+  enlace?: { texto: string; url: string }
   /** Nota chica al final, antes del pie. */
   nota?: string
 }
@@ -111,6 +113,10 @@ const boton = (b: { texto: string; url: string }) => `
     </td>
   </tr>
 </table>`
+
+/** Un segundo destino sin competir con el botón: texto subrayado, no otro botón. */
+const enlaceSecundario = (e: { texto: string; url: string }) =>
+  `<p style="margin:14px 0 0;font-family:${FUENTE};font-size:14px;line-height:1.5;"><a href="${esc(e.url)}" target="_blank" style="color:${C.indigo};font-weight:600;text-decoration:underline;">${esc(e.texto)}</a></p>`
 
 export function render(c: Correo): string {
   const tono = TONOS[c.tono ?? 'neutro']
@@ -172,6 +178,7 @@ export function render(c: Correo): string {
         ${(c.parrafos ?? []).map(parrafo).join('')}
         ${datos}
         ${c.boton ? boton(c.boton) : ''}
+        ${c.enlace ? enlaceSecundario(c.enlace) : ''}
         ${c.nota ? `<p style="margin:20px 0 0;padding-top:16px;border-top:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;line-height:1.6;color:${C.suave};">${esc(c.nota)}</p>` : ''}
       </td>
     </tr>
@@ -206,6 +213,7 @@ export function texto(c: Correo): string {
     for (const [k, v] of c.datos) l.push(`${k}: ${v}`)
   }
   if (c.boton) l.push('', `${c.boton.texto}: ${c.boton.url}`)
+  if (c.enlace) l.push('', `${c.enlace.texto}: ${c.enlace.url}`)
   if (c.nota) l.push('', c.nota)
   l.push('', '—', 'TuWebGo · Páginas web para negocios en Venezuela', SITIO)
   return l.join('\n')

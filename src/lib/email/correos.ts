@@ -1,5 +1,7 @@
 import { enviarCorreo, EQUIPO } from '@/lib/email/enviar'
 import type { Correo } from '@/lib/email/plantilla'
+import { SITIO } from '@/lib/config'
+import { formatPhoneVE, waLink } from '@/lib/whatsapp'
 
 /**
  * Los correos concretos que manda el sistema.
@@ -269,4 +271,158 @@ export function avisarCampanaDetenida(c: { nombre: string; motivo: string; resta
     nota: 'Lo más común: la plantilla todavía no está aprobada, o cambió y hay que volver a subirla.',
   }
   return interno(`Campaña detenida · ${c.nombre}`, correo, 'campana_detenida')
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. Formulario de contacto de tuwebgo.net
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * A quién le llegan los contactos de la web: a Rafael, que lo pidió así.
+ * A diferencia del SLA, Jodany no. Si algún día hace falta, se agrega acá.
+ */
+const DESTINO_CONTACTO_WEB = EQUIPO[0]
+
+/** De qué botón vino, dicho como lo diría una persona. */
+const ORIGEN_LEGIBLE: Record<string, string> = {
+  nav: 'Menú de arriba',
+  mobile_menu: 'Menú del celular',
+  hero: 'Portada',
+  proceso: 'Sección "Proceso"',
+  pricing: 'Precios',
+  cta_final: 'Cierre de la página',
+  footer_link: 'Pie de página',
+  floating: 'Botón flotante',
+  enlace: 'Enlace directo a #contacto',
+}
+
+export type ContactoWeb = {
+  nombre: string
+  negocio: string | null
+  /** Móvil o internacional en E.164 sin "+": el único que sirve para WhatsApp. */
+  telefonoE164: string | null
+  /** Lo que escribió tal cual, por si es un fijo que no pasa a E.164. */
+  telefono: string | null
+  correo: string | null
+  /** Ya legible: "Sitio Pro ($497)", no la clave. */
+  plan: string | null
+  mensaje: string | null
+  idioma: 'es' | 'en'
+  origen: string | null
+  /** La etapa en la que ya estaba en el CRM. null si es un contacto nuevo. */
+  etapaPrevia: string | null
+  /** false si la base falló y este correo es lo único que quedó del contacto. */
+  guardado: boolean
+}
+
+/**
+ * Alguien llenó el formulario de la web.
+ *
+ * Este correo ES la notificación. A diferencia de WhatsApp, acá no hay Sofía
+ * respondiendo mientras tanto: hasta que alguien le escriba, el cliente no
+ * sabe nada de nosotros. Por eso el botón principal no lleva al portal sino
+ * directo a escribirle, con el saludo ya redactado.
+ *
+ * El botón abre el WhatsApp de quien lee el correo, no el del negocio. Eso es
+ * justo lo que hace falta mientras el número de la API esté bloqueado.
+ */
+export function avisarContactoWeb(c: ContactoWeb) {
+  const primerNombre = c.nombre.split(' ')[0]
+  const saludo =
+    c.idioma === 'en'
+      ? `Hi ${primerNombre}, this is TuWebGo. Thanks for reaching out through our website.`
+      : `Hola ${primerNombre}, te escribo de TuWebGo por el mensaje que nos dejaste en la web.`
+  const whatsapp = c.telefonoE164 ? waLink(c.telefonoE164, saludo) : null
+
+  const boton = whatsapp
+    ? { texto: 'Escribirle por WhatsApp', url: whatsapp }
+    : c.telefono
+      ? { texto: 'Llamar', url: `tel:${c.telefono.replace(/[^\d+]/g, '')}` }
+      : c.correo
+        ? { texto: 'Responderle por correo', url: `mailto:${c.correo}` }
+        : undefined
+
+  const correo: Correo = {
+    preheader: `${c.nombre}${c.negocio ? ` (${c.negocio})` : ''} dejó sus datos en la web${c.plan ? `. Le interesa: ${c.plan}` : ''}.`,
+    etiqueta: 'Contacto desde la web',
+    tono: c.guardado ? 'aviso' : 'urgente',
+    titulo: `${c.nombre} quiere hablar con nosotros`,
+    parrafos: [
+      ...(c.guardado
+        ? []
+        : ['Ojo: no se pudo guardar en el CRM. Este correo es lo único que quedó de este contacto.']),
+      `Llenó el formulario de tuwebgo.net${c.idioma === 'en' ? ' desde la versión en inglés' : ''}. No pasó por WhatsApp ni por Sofía, así que nadie le ha respondido todavía.`,
+      whatsapp
+        ? 'El botón abre tu WhatsApp con un saludo listo para mandarle.'
+        : c.telefono
+          ? 'El teléfono que dejó no es de WhatsApp: la vía es llamar.'
+          : 'Solo dejó correo: respóndele desde aquí mismo.',
+    ],
+    datos: [
+      ['Nombre', c.nombre],
+      c.negocio ? ['Negocio', c.negocio] : null,
+      c.telefono ? ['Teléfono', c.telefonoE164 ? formatPhoneVE(c.telefonoE164) : c.telefono] : null,
+      c.correo ? ['Correo', c.correo] : null,
+      c.plan ? ['Le interesa', c.plan] : null,
+      c.mensaje ? ['Lo que escribió', c.mensaje] : null,
+      [
+        'En el CRM',
+        !c.guardado
+          ? 'No se guardó'
+          : c.etapaPrevia
+            ? `Ya estaba, en "${c.etapaPrevia.replace(/_/g, ' ')}"`
+            : 'Contacto nuevo',
+      ],
+      c.origen ? ['Botón que usó', ORIGEN_LEGIBLE[c.origen] ?? c.origen] : null,
+    ].filter(Boolean) as [string, string][],
+    boton,
+    enlace: { texto: 'Ver el pipeline', url: `${PORTAL}/dashboard/pipeline` },
+    nota: c.correo
+      ? `Si le das a responder, el correo le llega directo a ${c.correo}.`
+      : 'No dejó correo: si respondes este mensaje, no le llega.',
+  }
+
+  return enviarCorreo({
+    para: DESTINO_CONTACTO_WEB,
+    asunto: `Contacto web · ${c.nombre}${c.negocio ? ` · ${c.negocio}` : ''}`,
+    correo,
+    etiqueta: 'contacto_web',
+    // Responder desde Gmail le escribe al cliente, no a hola@tuwebgo.net.
+    ...(c.correo ? { responderA: c.correo } : {}),
+  })
+}
+
+/**
+ * La confirmación al que llenó el formulario. Solo en español: la plantilla
+ * de marca está en español, y un correo mitad en cada idioma se ve peor que
+ * no mandarlo.
+ *
+ * Es el único correo del sistema que sale hacia una dirección que escribió un
+ * desconocido. Por eso NO repite nada de lo que escribió salvo el nombre, y
+ * solo si parece un nombre (lo decide quien llama): si no, este correo serviría
+ * para mandar texto arbitrario, con nuestra marca, a la dirección de otro.
+ */
+export function confirmarContactoAlCliente(c: { correo: string; nombre: string | null; conTelefono: boolean }) {
+  const cuerpo: Correo = {
+    preheader: 'Ya tenemos tus datos. Te contactamos muy pronto.',
+    etiqueta: 'Recibido',
+    tono: 'bueno',
+    titulo: 'Recibimos tu mensaje',
+    parrafos: [
+      `${c.nombre ? `Gracias por escribirnos, ${c.nombre}.` : 'Gracias por escribirnos.'} Tus datos ya le llegaron al equipo.`,
+      c.conTelefono
+        ? 'Te vamos a contactar por teléfono o por WhatsApp para conocer tu negocio y contarte cómo arrancamos.'
+        : 'Te vamos a responder por este mismo correo para conocer tu negocio y contarte cómo arrancamos.',
+      'Mientras tanto, puedes ver algunas de las páginas que ya hicimos para otros negocios.',
+    ],
+    boton: { texto: 'Ver trabajos', url: `${SITIO}/#portafolio` },
+    nota: 'Si quieres agregar algo, responde a este correo y le llega directo a una persona del equipo.',
+  }
+  return enviarCorreo({
+    para: c.correo,
+    asunto: 'Recibimos tu mensaje — TuWebGo',
+    correo: cuerpo,
+    etiqueta: 'contacto_confirmacion',
+    responderA: EQUIPO[0],
+  })
 }
